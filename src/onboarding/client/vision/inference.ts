@@ -5,6 +5,7 @@ import type { LandmarkSample } from './types'
 import type { HandsMode } from './worker-protocol'
 
 export type InferenceOptions = { tier: PoseTier; enableHands: boolean; assetBase: string }
+/** Callers must pass strictly increasing `tMs` (MediaPipe VIDEO mode requirement); the session enforces it. */
 export type Inference = { run(frame: ImageBitmap, tMs: number, hands: HandsMode): LandmarkSample; close(): void }
 
 const MIN_CONFIDENCE = 0.7
@@ -38,58 +39,70 @@ export async function createInference(o: InferenceOptions): Promise<Inference> {
   const model = (file: string) => loadVerified(`${o.assetBase}/models/${file}`, manifest[file])
   const fileset = await FilesetResolver.forVisionTasks(`${o.assetBase}/wasm`, true)
 
-  const poseModel = await model(MODEL_FILES.pose[o.tier])
-  const pose = await withGpuFallback((delegate) => PoseLandmarker.createFromOptions(fileset, {
-    baseOptions: { modelAssetBuffer: poseModel, delegate }, runningMode: 'VIDEO', numPoses: 2,
-    minPoseDetectionConfidence: MIN_CONFIDENCE, minPosePresenceConfidence: MIN_CONFIDENCE, minTrackingConfidence: MIN_CONFIDENCE,
-  }))
-  const faceModel = await model(MODEL_FILES.face)
-  const face = await withGpuFallback((delegate) => FaceLandmarker.createFromOptions(fileset, {
-    baseOptions: { modelAssetBuffer: faceModel, delegate }, runningMode: 'VIDEO', numFaces: 2,
-    outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true,
-    minFaceDetectionConfidence: MIN_CONFIDENCE, minFacePresenceConfidence: MIN_CONFIDENCE, minTrackingConfidence: MIN_CONFIDENCE,
-  }))
-  let hand: HandLandmarker | null = null
-  if (o.enableHands) {
-    const handModel = await model(MODEL_FILES.hand)
-    hand = await withGpuFallback((delegate) => HandLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetBuffer: handModel, delegate }, runningMode: 'VIDEO', numHands: 2,
-      minHandDetectionConfidence: MIN_CONFIDENCE, minHandPresenceConfidence: MIN_CONFIDENCE, minTrackingConfidence: MIN_CONFIDENCE,
+  // Close any landmarker already created if a later step throws, so a failed init leaks no WASM heap.
+  const made: { close(): void }[] = []
+  try {
+    const poseModel = await model(MODEL_FILES.pose[o.tier])
+    const pose = await withGpuFallback((delegate) => PoseLandmarker.createFromOptions(fileset, {
+      baseOptions: { modelAssetBuffer: poseModel, delegate }, runningMode: 'VIDEO', numPoses: 2,
+      minPoseDetectionConfidence: MIN_CONFIDENCE, minPosePresenceConfidence: MIN_CONFIDENCE, minTrackingConfidence: MIN_CONFIDENCE,
     }))
-  }
+    made.push(pose)
+    const faceModel = await model(MODEL_FILES.face)
+    const face = await withGpuFallback((delegate) => FaceLandmarker.createFromOptions(fileset, {
+      baseOptions: { modelAssetBuffer: faceModel, delegate }, runningMode: 'VIDEO', numFaces: 2,
+      outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true,
+      minFaceDetectionConfidence: MIN_CONFIDENCE, minFacePresenceConfidence: MIN_CONFIDENCE, minTrackingConfidence: MIN_CONFIDENCE,
+    }))
+    made.push(face)
+    let hand: HandLandmarker | null = null
+    if (o.enableHands) {
+      const handModel = await model(MODEL_FILES.hand)
+      hand = await withGpuFallback((delegate) => HandLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetBuffer: handModel, delegate }, runningMode: 'VIDEO', numHands: 2,
+        minHandDetectionConfidence: MIN_CONFIDENCE, minHandPresenceConfidence: MIN_CONFIDENCE, minTrackingConfidence: MIN_CONFIDENCE,
+      }))
+    }
+    if (hand) made.push(hand)
 
-  const canvas = new OffscreenCanvas(32, 18)
-  const ctx2d = canvas.getContext('2d', { willReadFrequently: true })
-  if (!ctx2d) throw new Error('vision: 2d context unavailable for brightness check')
-  const luma = (frame: ImageBitmap) => {
-    ctx2d.drawImage(frame, 0, 0, 32, 18)
-    const d = ctx2d.getImageData(0, 0, 32, 18).data
-    let sum = 0
-    for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i]! + 0.7152 * d[i + 1]! + 0.0722 * d[i + 2]!
-    return sum / (d.length / 4)
-  }
+    const canvas = new OffscreenCanvas(32, 18)
+    const ctx2d = canvas.getContext('2d', { willReadFrequently: true })
+    if (!ctx2d) throw new Error('vision: 2d context unavailable for brightness check')
+    const luma = (frame: ImageBitmap) => {
+      ctx2d.drawImage(frame, 0, 0, 32, 18)
+      const d = ctx2d.getImageData(0, 0, 32, 18).data
+      let sum = 0
+      for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i]! + 0.7152 * d[i + 1]! + 0.0722 * d[i + 2]!
+      return sum / (d.length / 4)
+    }
 
-  let lastHands: { tMs: number; result: HandLandmarkerResult } | null = null
+    let lastHands: { tMs: number; result: HandLandmarkerResult } | null = null
 
-  return {
-    run(frame, tMs, handsMode) {
-      const poseRes = pose.detectForVideo(frame, tMs)
-      const faceRes = face.detectForVideo(frame, tMs)
-      let handsRes: HandLandmarkerResult | null = null
-      if (hand && handsMode !== 'off') {
-        if (handsMode === 'run' || !lastHands || tMs - lastHands.tMs > HAND_REUSE_MS) {
-          lastHands = { tMs, result: hand.detectForVideo(frame, tMs) }
+    return {
+      run(frame, tMs, handsMode) {
+        const poseRes = pose.detectForVideo(frame, tMs)
+        const faceRes = face.detectForVideo(frame, tMs)
+        let handsRes: HandLandmarkerResult | null = null
+        if (hand && handsMode !== 'off') {
+          if (handsMode === 'run' || !lastHands || tMs - lastHands.tMs > HAND_REUSE_MS) {
+            lastHands = { tMs, result: hand.detectForVideo(frame, tMs) }
+          }
+          handsRes = lastHands.result
         }
-        handsRes = lastHands.result
-      }
-      const sample = toSample({ tMs, frameW: frame.width, frameH: frame.height, luma: luma(frame), pose: poseRes, face: faceRes, hands: handsRes })
-      poseRes.close()
-      return sample
-    },
-    close() {
-      pose.close()
-      face.close()
-      hand?.close()
-    },
+        try {
+          return toSample({ tMs, frameW: frame.width, frameH: frame.height, luma: luma(frame), pose: poseRes, face: faceRes, hands: handsRes })
+        } finally {
+          poseRes.close()
+        }
+      },
+      close() {
+        pose.close()
+        face.close()
+        hand?.close()
+      },
+    }
+  } catch (err) {
+    for (const m of made) m.close()
+    throw err
   }
 }

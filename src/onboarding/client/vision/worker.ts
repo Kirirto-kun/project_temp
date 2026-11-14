@@ -32,9 +32,5 @@ async function handle(m: ToWorker) {
         m.bitmap.close()
       }
       return
-    case 'dispose':
-      inference?.close()
-      inference = null
-      return
   }
 }

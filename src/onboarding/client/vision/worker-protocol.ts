@@ -7,7 +7,6 @@ export type HandsMode = 'run' | 'reuse' | 'off'
 export type ToWorker =
   | { type: 'init'; tier: PoseTier; enableHands: boolean; assetBase: string }
   | { type: 'frame'; id: number; tMs: number; bitmap: ImageBitmap; hands: HandsMode }
-  | { type: 'dispose' }
 
 /** Everything the worker may send back. Strict: nothing beyond a compact sample crosses the boundary. */
 export const FromWorkerSchema = z.discriminatedUnion('type', [

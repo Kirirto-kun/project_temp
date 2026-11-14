@@ -47,22 +47,44 @@ export function createWorkerSource(assetBase = ASSET_BASE): LandmarkSource {
   }
   worker.onerror = (e) => failAll(new Error(`vision worker crashed: ${e.message}`))
 
-  const post = (m: ToWorker, transfer: Transferable[] = []) => worker.postMessage(m, transfer)
+  worker.onmessageerror = () => failAll(new Error('vision worker sent an undeserializable message'))
+
+  let disposed = false
+  const DISPOSED = () => new Error('vision source disposed')
 
   return {
     init: (o) => new Promise<void>((resolve, reject) => {
+      if (disposed) return reject(DISPOSED())
+      // A newer init supersedes a pending one: the earlier caller is rejected rather than orphaned.
+      initWaiter?.reject(new Error('vision init superseded'))
       initWaiter = { resolve, reject }
-      post({ type: 'init', tier: o.tier, enableHands: o.enableHands, assetBase })
+      try {
+        worker.postMessage({ type: 'init', tier: o.tier, enableHands: o.enableHands, assetBase } satisfies ToWorker)
+      } catch (err) {
+        initWaiter = null
+        reject(err instanceof Error ? err : new Error(String(err)))
+      }
     }),
     process: (bitmap, tMs, hands) => new Promise<ProcessResult>((resolve, reject) => {
+      if (disposed) {
+        bitmap.close()
+        return reject(DISPOSED())
+      }
       const id = nextId++
       pending.set(id, { resolve, reject })
-      post({ type: 'frame', id, tMs, bitmap, hands }, [bitmap])
+      try {
+        worker.postMessage({ type: 'frame', id, tMs, bitmap, hands } satisfies ToWorker, [bitmap])
+      } catch (err) {
+        pending.delete(id)
+        bitmap.close() // the transfer did not happen, so we still own it
+        reject(err instanceof Error ? err : new Error(String(err)))
+      }
     }),
+    // terminate() frees the worker's WASM heap and landmarkers; the worker needs no cleanup message.
     dispose: () => {
-      post({ type: 'dispose' })
+      disposed = true
       worker.terminate()
-      failAll(new Error('vision source disposed'))
+      failAll(DISPOSED())
     },
   }
 }
@@ -70,11 +92,18 @@ export function createWorkerSource(assetBase = ASSET_BASE): LandmarkSource {
 /** Same pipeline on the main thread, for browsers where MediaPipe will not start in a module worker. */
 export function createMainThreadSource(assetBase = ASSET_BASE): LandmarkSource {
   let inference: import('./inference').Inference | null = null
+  let generation = 0 // bumped by dispose/init so a stale in-flight init can detect it was superseded
   return {
     async init(o) {
+      const gen = ++generation
       const { createInference } = await import('./inference')
+      const created = await createInference({ ...o, assetBase })
+      if (gen !== generation) {
+        created.close()
+        throw new Error('vision source disposed')
+      }
       inference?.close()
-      inference = await createInference({ ...o, assetBase })
+      inference = created
     },
     async process(frame, tMs, hands) {
       try {
@@ -87,6 +116,7 @@ export function createMainThreadSource(assetBase = ASSET_BASE): LandmarkSource {
       }
     },
     dispose() {
+      generation++
       inference?.close()
       inference = null
     },
