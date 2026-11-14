@@ -73,7 +73,7 @@ function applyExtraction(session: IntakeSession, extraction: Extraction, sourceT
   };
 }
 
-export async function createIntake(deps: PlatformDeps, ownerId: string, input: { mode: 'text' | 'audio'; consents: Consents; consentVersion: number }): Promise<IntakeView> {
+export async function createIntake(deps: PlatformDeps, ownerId: string, input: { mode: 'text' | 'audio' | 'video'; consents: Consents; consentVersion: number }): Promise<IntakeView> {
   if (!deps.capabilities.coachIntake) throw new ApiError('FEATURE_DISABLED', 'The coach is not available. Use the quick form.');
   const now = deps.now().toISOString();
   const session: IntakeSession = {
@@ -81,7 +81,7 @@ export async function createIntake(deps: PlatformDeps, ownerId: string, input: {
     ownerId,
     revision: 1,
     profileRevision: 0,
-    phase: input.mode === 'audio' ? 'lobby' : 'interviewing',
+    phase: input.mode === 'text' ? 'interviewing' : 'lobby',
     profile: emptyProfile(),
     consentVersion: Math.max(1, input.consentVersion),
     consents: { audioAnalysis: input.consents.audioAnalysis && deps.capabilities.voiceAnalysis, visualAnalysis: false },
@@ -101,6 +101,7 @@ export async function createIntake(deps: PlatformDeps, ownerId: string, input: {
     handoff: null,
     toolCalls: [],
     budgetReservation: null,
+    providerSessionId: null,
   };
   await intakeStore(deps).create(session);
   return view(deps, session);
@@ -358,7 +359,13 @@ async function settleMediaBudget(deps: PlatformDeps, s: IntakeSession) {
   if (!s.budgetReservation || !s.deadlineAt) return;
   const startedMs = new Date(s.deadlineAt).getTime() - MEDIA_LIMIT_MS;
   const minutes = Math.max(1, Math.ceil((deps.now().getTime() - startedMs) / 60_000));
-  await deps.budget.reconcile(s.budgetReservation, Math.min(5, minutes) * COST_ESTIMATES.realtimePerMinute).catch(() => undefined);
+  const perMinute = s.budgetReservation.category === 'avatar' ? COST_ESTIMATES.avatarPerMinute : COST_ESTIMATES.realtimePerMinute;
+  await deps.budget.reconcile(s.budgetReservation, Math.min(5, minutes) * perMinute).catch(() => undefined);
+}
+
+/** Best effort: a missed stop is bounded by the session's max_session_duration on LiveAvatar's side. */
+async function stopProviderSession(deps: PlatformDeps, s: IntakeSession) {
+  if (s.providerSessionId) await deps.liveAvatar?.stopSession(s.providerSessionId).catch(() => undefined);
 }
 
 /** Closes media for this intake. Never blocked by a stale revision; bumps the provider epoch so late tool calls are ignored. */
@@ -372,9 +379,13 @@ export async function stopMedia(deps: PlatformDeps, ownerId: string, id: string,
     }
     settled = s;
     const phase = s.phase === 'completed' ? s.phase : s.phase === 'connecting' || s.phase === 'lobby' ? 'interrupted' : 'review';
-    return { ...s, mediaStatus: 'closed', providerEpoch: s.providerEpoch + 1, phase, budgetReservation: null };
+    return { ...s, mediaStatus: 'closed', providerEpoch: s.providerEpoch + 1, phase, budgetReservation: null, providerSessionId: null };
   });
-  if (settled) await settleMediaBudget(deps, settled);
+  const closed = settled as IntakeSession | null;
+  if (closed) {
+    await settleMediaBudget(deps, closed);
+    await stopProviderSession(deps, closed);
+  }
   return view(deps, session);
 }
 
@@ -382,18 +393,23 @@ export async function deleteIntake(deps: PlatformDeps, ownerId: string, id: stri
   const store = intakeStore(deps);
   const session = await store.readOwned(id, ownerId);
   if (session.mediaStatus === 'active' || session.mediaStatus === 'connecting') await settleMediaBudget(deps, session);
+  await stopProviderSession(deps, session);
   await store.delete(id);
 }
 
+interface MediaAttempt {
+  current: IntakeSession;
+  resuming: boolean;
+  reservation: IntakeSession['budgetReservation'];
+  now: Date;
+}
+
 /**
- * Starts (or resumes) the audio call: one paid attempt per explicit connect, at most three
- * per IP per day, five minutes from the first connect. Returns a short-lived client secret.
+ * Shared start of a paid call attempt: ownership, revision and deadline checks, then one quota
+ * unit and a five-minute budget hold, unless an attempt within the deadline is being resumed.
  */
-export async function connectAudio(deps: PlatformDeps, ownerId: string, ipHash: string, id: string, expectedRevision: number) {
-  const env = serverEnv();
-  if (!deps.capabilities.coachVoice || !env.openaiRealtime) throw new ApiError('FEATURE_DISABLED', 'The voice call is not available right now. Continue by typing.');
-  const store = intakeStore(deps);
-  const current = await store.readOwned(id, ownerId);
+async function beginMediaAttempt(deps: PlatformDeps, ownerId: string, ipHash: string, id: string, expectedRevision: number, category: 'realtime' | 'avatar', perMinute: number): Promise<MediaAttempt> {
+  const current = await intakeStore(deps).readOwned(id, ownerId);
   if (current.phase === 'completed') throw new ApiError('INVALID_INPUT', 'This coach session is finished.');
   if (current.revision !== expectedRevision) throw new ApiError('VERSION_CONFLICT', 'Reload and try again.', { currentVersion: current.revision });
   const now = deps.now();
@@ -404,26 +420,68 @@ export async function connectAudio(deps: PlatformDeps, ownerId: string, ipHash: 
   let reservation = current.budgetReservation;
   if (!resuming) {
     await deps.quota.consume('intake', ipHash, ownerId);
-    reservation = await deps.budget.reserve('realtime', 5 * COST_ESTIMATES.realtimePerMinute);
+    reservation = await deps.budget.reserve(category, 5 * perMinute);
   }
+  return { current, resuming, reservation, now };
+}
+
+async function abandonMediaAttempt(deps: PlatformDeps, ipHash: string, attempt: MediaAttempt) {
+  if (attempt.resuming) return;
+  if (attempt.reservation) await deps.budget.reconcile(attempt.reservation, 0);
+  await deps.quota.refund('intake', ipHash);
+}
+
+function openAttempt(s: IntakeSession, mode: 'audio' | 'video', attempt: MediaAttempt, providerSessionId: string | null): IntakeSession {
+  return {
+    ...s,
+    mode,
+    mediaStatus: 'connecting',
+    phase: s.phase === 'lobby' || s.phase === 'interrupted' ? 'interviewing' : s.phase,
+    providerEpoch: s.providerEpoch + 1,
+    deadlineAt: attempt.resuming ? s.deadlineAt : new Date(attempt.now.getTime() + MEDIA_LIMIT_MS).toISOString(),
+    budgetReservation: attempt.reservation,
+    providerSessionId,
+  };
+}
+
+/**
+ * Starts (or resumes) the audio call: one paid attempt per explicit connect, at most three
+ * per IP per day, five minutes from the first connect. Returns a short-lived client secret.
+ */
+export async function connectAudio(deps: PlatformDeps, ownerId: string, ipHash: string, id: string, expectedRevision: number) {
+  const env = serverEnv();
+  if (!deps.capabilities.coachVoice || !env.openaiRealtime) throw new ApiError('FEATURE_DISABLED', 'The voice call is not available right now. Continue by typing.');
+  const attempt = await beginMediaAttempt(deps, ownerId, ipHash, id, expectedRevision, 'realtime', COST_ESTIMATES.realtimePerMinute);
   let secret;
   try {
     secret = await mintRealtimeSecret({ apiKey: env.openaiRealtime.apiKey, model: env.openaiRealtime.model, voice: env.openaiRealtime.voice, transcribeModel: process.env.OPENAI_TRANSCRIBE_MODEL?.trim() || 'gpt-4o-mini-transcribe' });
   } catch {
-    if (!resuming && reservation) await deps.budget.reconcile(reservation, 0);
-    if (!resuming) await deps.quota.refund('intake', ipHash);
+    await abandonMediaAttempt(deps, ipHash, attempt);
     throw new ApiError('UPSTREAM_UNAVAILABLE', 'The voice call could not start. Continue by typing; your answers are kept.', {}, 10);
   }
-  const { session } = await store.update(id, (s) => ({
-    ...s,
-    mode: 'audio',
-    mediaStatus: 'connecting',
-    phase: s.phase === 'lobby' || s.phase === 'interrupted' ? 'interviewing' : s.phase,
-    providerEpoch: s.providerEpoch + 1,
-    deadlineAt: resuming ? s.deadlineAt : new Date(now.getTime() + MEDIA_LIMIT_MS).toISOString(),
-    budgetReservation: reservation,
-  }));
+  const { session } = await intakeStore(deps).update(id, (s) => openAttempt(s, 'audio', attempt, null));
   return { intake: view(deps, session), clientSecret: secret.value, expiresAt: secret.expiresAt, model: env.openaiRealtime.model, providerEpoch: session.providerEpoch, deadlineAt: session.deadlineAt! };
+}
+
+/**
+ * Starts (or resumes) the avatar video call with the same quota, budget and deadline rules.
+ * Returns only a short-lived LiveAvatar session token; keys and the agent secret stay here.
+ */
+export async function connectVideo(deps: PlatformDeps, ownerId: string, ipHash: string, id: string, expectedRevision: number) {
+  const liveAvatar = deps.liveAvatar;
+  if (!deps.capabilities.avatarIntake || !liveAvatar) throw new ApiError('FEATURE_DISABLED', 'The video call is not available right now.');
+  const attempt = await beginMediaAttempt(deps, ownerId, ipHash, id, expectedRevision, 'avatar', COST_ESTIMATES.avatarPerMinute);
+  await stopProviderSession(deps, attempt.current);
+  const deadlineMs = attempt.resuming && attempt.current.deadlineAt ? new Date(attempt.current.deadlineAt).getTime() : attempt.now.getTime() + MEDIA_LIMIT_MS;
+  let token;
+  try {
+    token = await liveAvatar.mintToken({ maxSeconds: (deadlineMs - attempt.now.getTime()) / 1_000 });
+  } catch {
+    await abandonMediaAttempt(deps, ipHash, attempt);
+    throw new ApiError('UPSTREAM_UNAVAILABLE', 'The video call could not start. Your answers are kept.', {}, 10);
+  }
+  const { session } = await intakeStore(deps).update(id, (s) => openAttempt(s, 'video', attempt, token.sessionId));
+  return { intake: view(deps, session), sessionToken: token.sessionToken, providerEpoch: session.providerEpoch, deadlineAt: session.deadlineAt! };
 }
 
 export const TranscriptEventSchema = z.object({ providerEpoch: z.number().int(), itemId: z.string().min(1).max(120), role: z.enum(['user', 'coach']), text: z.string().trim().min(1).max(4_000) });

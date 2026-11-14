@@ -12,6 +12,7 @@ import { DEFAULT_LIMITS, Quota } from './limits/quota';
 import { modelPortsFromEnv } from './llm/provider';
 import { logEvent } from './observability';
 import { PolarApi } from './payments/polar';
+import { createLiveAvatar } from '@/onboarding/server/liveavatar';
 import type { PlatformDeps } from './platform';
 import { MemoryKV, UpstashKV, type KeyValueStore } from './storage/kv';
 import { MemoryAudioStore, S3AudioStore, type AudioStore } from './voice/audio-store';
@@ -90,6 +91,7 @@ export function getDeps(): PlatformDeps {
     scribe: env.elevenlabs && capabilities.voiceAnalysis ? new ElevenLabsScribe(env.elevenlabs.apiKey, env.elevenlabs.sttModel) : null,
     elevenlabs: env.elevenlabs?.agentId && capabilities.voice ? new ElevenLabsAgentCredentials(env.elevenlabs.apiKey, env.elevenlabs.agentId) : null,
     polar: env.polar && capabilities.payments ? new PolarApi(env.polar.accessToken, env.polar.server) : null,
+    liveAvatar: env.liveAvatar && capabilities.avatarIntake ? createLiveAvatar(env.liveAvatar) : null,
     schedule,
   };
   deps.intake = createIntakePort(deps);
