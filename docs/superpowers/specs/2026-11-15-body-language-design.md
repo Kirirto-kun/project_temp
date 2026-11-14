@@ -95,7 +95,7 @@ Files (under `src/onboarding/client/vision/` unless noted):
 ## Events upload
 
 - `EventsBatch = { seq, consentVersion, observations: Observation[] }`, sent every 5 s or 20 observations, and once on stop.
-- Idempotency-Key = `${intakeId}:${seq}`; retries reuse it (backoff 1 s, 2 s, 4 s, then hold and send with the next flush).
+- Idempotency-Key = `${intakeId}:${consentVersion}:${instanceId}:${seq}` (instanceId is a random UUID per uploader, so a page reload never reuses a key with a different body); retries reuse it (backoff 1 s, 2 s, 4 s, then hold and send with the next flush). 5xx and network errors retry; 409/410 stop the uploader; other 4xx drop that batch and continue.
 - On consent revoke: stop capture, drop queued batches, never send again for that `consentVersion`. A 409/410 from the server stops the uploader.
 - The schema is strict: a batch containing landmark arrays or image data fails validation before sending.
 - Until B ships the endpoint, `mockEventsHandler` (an injectable `fetch`) validates and records batches for tests and the demo.
