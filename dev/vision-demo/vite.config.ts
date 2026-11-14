@@ -19,7 +19,7 @@ function rawIntakeWasm(): Plugin {
         const m = /^\/intake\/wasm\/([\w.-]+)\.(js|wasm)$/.exec(path)
         const file = m && `${repo}/public${path}`
         if (!m || !file || !existsSync(file)) return next()
-        res.setHeader('Content-Type', WASM_TYPES[m[2]])
+        res.setHeader('Content-Type', WASM_TYPES[m[2]!]!)
         createReadStream(file).pipe(res)
       })
     },

@@ -199,7 +199,7 @@ describe('createVisionSession', () => {
     expect(calls.frames).toBe(1)
     expect(session.getSamples()).toHaveLength(0)
     expect(frames).toHaveLength(1)
-    expect(frames[0].close).toHaveBeenCalledTimes(1)
+    expect(frames[0]!.close).toHaveBeenCalledTimes(1)
   })
 
   it('never leaves the loop rejecting when a step outside step() throws', async () => {
@@ -316,7 +316,7 @@ describe('createVisionSession', () => {
     await until(() => stopped.grabs.n > 0)
     await stopped.session.stop()
     grabGate.open()
-    await until(() => stopped.frames.length === 1 && stopped.frames[0].close.mock.calls.length > 0)
+    await until(() => stopped.frames.length === 1 && stopped.frames[0]!.close.mock.calls.length > 0)
     expect(stopped.calls.frames).toBe(0)
     expect(allClosedOnce(stopped.frames)).toBe(true)
 
@@ -332,12 +332,12 @@ describe('createVisionSession', () => {
   it('passes strictly increasing timestamps when the clock stalls or goes backwards', async () => {
     const seq = [1000, 1000, 900, 1000, 500, 1200]
     let i = 0
-    const { session, calls } = setup({ clock: () => seq[i++ % seq.length] })
+    const { session, calls } = setup({ clock: () => seq[i++ % seq.length]! })
     await session.start()
     await until(() => calls.frames > 40)
     await session.stop()
     expect(calls.times.length).toBeGreaterThan(40)
-    calls.times.forEach((t, k) => k > 0 && expect(t).toBeGreaterThan(calls.times[k - 1]))
+    calls.times.forEach((t, k) => k > 0 && expect(t).toBeGreaterThan(calls.times[k - 1]!))
   })
 
   it('only uploads finalised events while running, never metrics', async () => {
@@ -365,8 +365,8 @@ describe('createVisionSession', () => {
     await until(() => calls.frames > 150)
     const samples = session.getSamples()
     await session.stop()
-    const span = samples.at(-1)!.tMs - samples[0].tMs
-    expect(samples[0].tMs).toBeGreaterThanOrEqual(samples.at(-1)!.tMs - 5000)
+    const span = samples.at(-1)!.tMs - samples[0]!.tMs
+    expect(samples[0]!.tMs).toBeGreaterThanOrEqual(samples.at(-1)!.tMs - 5000)
     expect(span).toBeGreaterThan(5000 - 2 * step)
     expect(samples.length).toBeLessThanOrEqual(5000 / step + 1)
     expect(samples.length).toBeGreaterThan(5000 / step - 3)
@@ -378,7 +378,7 @@ describe('createVisionSession', () => {
     await session.start()
     await until(() => calls.frames >= 200)
     await session.stop()
-    expect(session.getSamples()[0].tMs).toBeGreaterThan(3500) // the turn has slid out of the buffer
+    expect(session.getSamples()[0]!.tMs).toBeGreaterThan(3500) // the turn has slid out of the buffer
     const turns = uploader.push.mock.calls.flat(2).filter((o: Observation) => o.kind === 'head_turn_away')
     const distinct = new Set(turns.map((o: Observation) => o.id))
     expect(distinct.size).toBe(1)
