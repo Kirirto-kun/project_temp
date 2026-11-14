@@ -17,7 +17,7 @@ export function VisualReport({ summary, moments = [] }: Props) {
         <>
           <p className="mt-1 text-sm text-muted">
             Based on <span className="font-mono">{Math.round(summary.validMs / 1000)} s</span> of clear camera time
-            (<span className="font-mono">{pct}%</span> of the call).
+            (<span className="font-mono">{pct}%</span> of the analysed time).
           </p>
           {summary.status === 'partial' && (
             <p className="mt-2 text-sm text-muted">

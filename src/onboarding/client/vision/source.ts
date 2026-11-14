@@ -71,7 +71,7 @@ export function createWorkerSource(assetBase = ASSET_BASE, opts: { initTimeoutMs
       if (dead) return reject(dead)
       if (initWaiter) return reject(new Error('vision source init already in progress'))
       initWaiter = { resolve, reject }
-      initTimer = setTimeout(() => kill(new Error('vision worker did not start within 30 s')), initTimeoutMs)
+      initTimer = setTimeout(() => kill(new Error(`vision worker did not start within ${Math.round(initTimeoutMs / 1000)} s`)), initTimeoutMs)
       try {
         worker.postMessage({ type: 'init', tier: o.tier, enableHands: o.enableHands, assetBase } satisfies ToWorker)
       } catch (err) {

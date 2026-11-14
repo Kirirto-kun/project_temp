@@ -89,11 +89,11 @@ describe('worker source', () => {
   it('init timeout rejects, terminates and latches dead', async () => {
     vi.useFakeTimers()
     try {
-      const s = createWorkerSource('/a', { initTimeoutMs: 50 })
+      const s = createWorkerSource('/a', { initTimeoutMs: 2000 })
       const w = FakeWorker.last
       const p = s.init(initOpts)
-      const assertion = expect(p).rejects.toThrow('vision worker did not start within 30 s')
-      await vi.advanceTimersByTimeAsync(50)
+      const assertion = expect(p).rejects.toThrow('vision worker did not start within 2 s')
+      await vi.advanceTimersByTimeAsync(2000)
       await assertion
       expect(w.terminate).toHaveBeenCalledOnce()
       await expect(s.init(initOpts)).rejects.toThrow('did not start')

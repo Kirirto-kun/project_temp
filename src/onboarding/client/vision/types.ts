@@ -70,7 +70,9 @@ export const ObservationSchema = z.strictObject({
   source: z.literal('mediapipe'),
   modelVersion: z.string().min(1).max(80),
   unavailableReason: UnavailableReasonSchema.nullable(),
-})
+}).refine((o) => o.endMs >= o.startMs, { message: 'endMs must not precede startMs', path: ['endMs'] })
+  // +1 ms tolerates float accumulation in the duration sums
+  .refine((o) => o.validMs <= o.observedMs + 1, { message: 'validMs must not exceed observedMs', path: ['validMs'] })
 
 export const EventsBatchSchema = z.strictObject({
   seq: z.number().int().nonnegative(),
