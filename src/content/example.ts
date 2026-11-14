@@ -32,6 +32,7 @@ const SCRIPT: { text: string; move: Move }[] = [
   { text: 'I took over the payments team in spring and we shipped the migration a month early.', move: { type: 'justify', amountMinor: null, hasReason: true, tone: 'neutral', raw: '' } },
   { text: 'What would make $112,000 workable this cycle?', move: { type: 'ask_question', amountMinor: null, hasReason: false, tone: 'neutral', raw: '' } },
   { text: 'Given the scope I now own, $112,000 is fair for the role.', move: { type: 'state_number', amountMinor: 11_200_000, hasReason: true, tone: 'assertive', raw: '' } },
+  { text: '…', move: { type: 'hold_silence', amountMinor: null, hasReason: false, tone: 'neutral', raw: '' } },
   { text: 'Okay, I could do $104,000.', move: { type: 'concede', amountMinor: 10_400_000, hasReason: false, tone: 'apologetic', raw: '' } },
 ];
 
@@ -91,7 +92,7 @@ const EXAMPLE_VOICE: VoiceMetrics = {
   turns: [
     { turnId: 'example-1', turn: 1, wpm: 171, pauseRatio: 0.12, f0MeanHz: 138, f0StdHz: 21, pauseBeforeNumberMs: 1_400, fillers: 1, rmsDipAtNumber: true, tensionIndex: 22, unavailableReasons: [], relativeToBaseline: true },
     { turnId: 'example-4', turn: 4, wpm: 150, pauseRatio: 0.18, f0MeanHz: 124, f0StdHz: 17, pauseBeforeNumberMs: 300, fillers: 0, rmsDipAtNumber: false, tensionIndex: 6, unavailableReasons: [], relativeToBaseline: true },
-    { turnId: 'example-5', turn: 5, wpm: 182, pauseRatio: 0.3, f0MeanHz: 145, f0StdHz: 26, pauseBeforeNumberMs: 2_100, fillers: 2, rmsDipAtNumber: true, tensionIndex: 41, unavailableReasons: [], relativeToBaseline: true },
+    { turnId: 'example-6', turn: 6, wpm: 182, pauseRatio: 0.3, f0MeanHz: 145, f0StdHz: 26, pauseBeforeNumberMs: 2_100, fillers: 2, rmsDipAtNumber: true, tensionIndex: 41, unavailableReasons: [], relativeToBaseline: true },
   ],
 };
 

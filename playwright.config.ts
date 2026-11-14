@@ -31,6 +31,9 @@ export default defineConfig({
           STORAGE_DRIVER: 'memory',
           HOLDLINE_SIGNING_SECRET: 'e2e-only-signing-secret-not-for-production-use',
           HOLDLINE_ALLOW_INSECURE_COOKIES: '1',
+          // Every E2E request comes from one IP; production defaults stay at 3 per day.
+          SESSIONS_PER_IP_PER_DAY: '1000',
+          INTAKE_ATTEMPTS_PER_IP_PER_DAY: '1000',
         },
       },
 });
