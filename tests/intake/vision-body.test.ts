@@ -43,6 +43,22 @@ describe('detectBody', () => {
     expect(obs.filter((o) => o.kind === 'shoulder_raise')).toHaveLength(1)
   })
 
+  it('ignores shoulder raise while the nose is not visible', () => {
+    const raiseHiddenNose = (s: LandmarkSample) =>
+      withPose(s, { lShoulder: pt(0.62, 0.31), rShoulder: pt(0.38, 0.31), nose: pt(0.5, 0.18, 0.3) })
+    const obs = detectBody(qualify(timeline(0, 15000, 100, during(7000, 9000, raiseHiddenNose)), T), T, ctx)
+    expect(obs.filter((o) => o.kind === 'shoulder_raise')).toHaveLength(0)
+  })
+
+  it('still reports a posture shift while only the nose is hidden', () => {
+    const shiftHiddenNose = (s: LandmarkSample) => {
+      const m = shifted(s, 0.07, 0)
+      return withPose(m, { nose: pt(m.pose!.nose.x, m.pose!.nose.y, 0.3) })
+    }
+    const obs = detectBody(qualify(timeline(0, 15000, 100, during(7000, 9500, shiftHiddenNose)), T), T, ctx)
+    expect(obs.filter((o) => o.kind === 'posture_shift')).toHaveLength(1)
+  })
+
   it('says nothing when shoulders are not visible', () => {
     const hidden = (s: LandmarkSample) => withPose(s, { lShoulder: pt(0.62, 0.36, 0.3), rShoulder: pt(0.38, 0.36, 0.3) })
     expect(detectBody(qualify(timeline(0, 15000, 100, hidden), T), T, ctx)).toEqual([])
