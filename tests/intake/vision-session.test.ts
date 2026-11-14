@@ -68,6 +68,7 @@ function setup(
     clock?: () => number
     signal?: AbortSignal
     grabGate?: Gate
+    onUpdate?: (u: VisionUpdate) => void
   } = {},
 ) {
   const { source, calls } = fakeSource(o)
@@ -93,7 +94,10 @@ function setup(
       return frame as unknown as ImageBitmap
     },
     sleep: yieldTask,
-    onUpdate: (u) => updates.push(u),
+    onUpdate: (u) => {
+      updates.push(u)
+      o.onUpdate?.(u)
+    },
   })
   return { session, calls, updates, uploader, frames, grabs }
 }
@@ -146,12 +150,16 @@ describe('createVisionSession', () => {
 
   it('stops during init without ever running', async () => {
     const initGate = gate()
-    const { session, calls, updates } = setup({ initGate })
+    const { session, calls, updates, uploader } = setup({ initGate })
     await session.start()
     await until(() => calls.initStarted > 0)
     const summary = await session.stop()
+    const after = { updates: updates.length, pushes: uploader.push.mock.calls.length, inits: calls.initStarted }
     initGate.open()
     for (let i = 0; i < 20; i++) await yieldTask()
+    expect(updates.length).toBe(after.updates)
+    expect(uploader.push.mock.calls.length).toBe(after.pushes)
+    expect(calls.initStarted).toBe(after.inits)
     expect(calls.disposed).toBe(true)
     expect(updates.some((u) => u.status === 'running')).toBe(false)
     expect(updates.at(-1)!.status).toBe('stopped')
@@ -160,15 +168,62 @@ describe('createVisionSession', () => {
 
   it('stops while process is in flight and processes nothing afterwards', async () => {
     const processGate = gate()
-    const { session, calls, frames } = setup({ processGate })
+    const { session, calls, frames, grabs, updates, uploader } = setup({ processGate })
     await session.start()
     await until(() => calls.frames > 0)
     await session.stop()
+    const after = { updates: updates.length, pushes: uploader.push.mock.calls.length, grabs: grabs.n }
     processGate.open()
     for (let i = 0; i < 20; i++) await yieldTask()
+    expect(updates.length).toBe(after.updates)
+    expect(uploader.push.mock.calls.length).toBe(after.pushes)
+    expect(grabs.n).toBe(after.grabs)
     expect(calls.frames).toBe(1)
     expect(session.getSamples()).toHaveLength(0)
-    expect(allClosedOnce(frames)).toBe(true)
+    expect(frames).toHaveLength(1)
+    expect(frames[0].close).toHaveBeenCalledTimes(1)
+  })
+
+  it('never leaves the loop rejecting when a step outside step() throws', async () => {
+    const unhandled = vi.fn()
+    process.on('unhandledRejection', unhandled)
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const { session, calls, updates } = setup({
+        onUpdate: (u) => {
+          if (u.status === 'running') throw new Error('consumer broke')
+        },
+      })
+      await session.start()
+      await until(() => updates.some((u) => u.status === 'off'))
+      for (let i = 0; i < 20; i++) await yieldTask()
+      expect(updates.at(-1)).toMatchObject({ status: 'off', offReason: 'model_failed' })
+      expect(calls.disposed).toBe(true)
+      expect(errSpy).toHaveBeenCalled()
+      expect(unhandled).not.toHaveBeenCalled()
+      await session.stop()
+    } finally {
+      process.off('unhandledRejection', unhandled)
+      errSpy.mockRestore()
+    }
+  })
+
+  it('still emits the final update and returns the summary when flush rejects', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const { session, calls, updates, uploader } = setup()
+      uploader.flush.mockImplementation(async () => {
+        throw new Error('network down')
+      })
+      await session.start()
+      await until(() => calls.frames >= 200)
+      const summary = await session.stop()
+      expect(summary.status).toBe('ready')
+      expect(updates.at(-1)!.status).toBe('stopped')
+      expect(errSpy).toHaveBeenCalled()
+    } finally {
+      errSpy.mockRestore()
+    }
   })
 
   it('makes concurrent and repeated stops share one summary', async () => {

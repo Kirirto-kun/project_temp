@@ -132,7 +132,7 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
     emit()
   }
 
-  async function run() {
+  async function loop() {
     try {
       source = o.source ?? createWorkerSource()
       tier = await pickTier()
@@ -180,6 +180,17 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
     }
   }
 
+  /** Never rejects: it is launched with `void`, so a throw would be unhandled and leave status 'running'. */
+  async function run() {
+    try {
+      await loop()
+    } catch (err) {
+      if (!running) return
+      console.error('vision: session loop failed', err)
+      goOff('model_failed')
+    }
+  }
+
   const onAbort = () => {
     stop().catch((err) => console.error('vision: stop on abort failed', err))
   }
@@ -197,8 +208,12 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
     const { qualified, observations: finalObs } = detect()
     observations = finalObs
     if (o.uploader) {
-      o.uploader.push(finalObs)
-      await o.uploader.flush()
+      try {
+        o.uploader.push(finalObs)
+        await o.uploader.flush()
+      } catch (err) {
+        console.error('vision: final upload failed', err)
+      }
     }
     emit()
     if (samples.length === 0) {
