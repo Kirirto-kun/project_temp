@@ -18,7 +18,7 @@
     "cleanup": "node --env-file-if-exists=.env.local --import tsx scripts/cleanup.ts",
     "build": "next build",
     "start": "node scripts/serve.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
     "test:intake": "vitest run tests/intake",
