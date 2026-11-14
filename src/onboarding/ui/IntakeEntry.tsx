@@ -14,7 +14,7 @@ export function IntakeEntry() {
   const router = useRouter();
   const [caps, setCaps] = useState<Capabilities | null>(null);
   const [audioAnalysis, setAudioAnalysis] = useState(false);
-  const [busy, setBusy] = useState<'audio' | 'text' | null>(null);
+  const [busy, setBusy] = useState<'video' | 'audio' | 'text' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -23,7 +23,7 @@ export function IntakeEntry() {
       .catch(() => setCaps(null));
   }, []);
 
-  async function start(mode: 'audio' | 'text') {
+  async function start(mode: 'video' | 'audio' | 'text') {
     setBusy(mode);
     setError(null);
     try {
@@ -36,6 +36,8 @@ export function IntakeEntry() {
   }
 
   const voice = caps?.coachVoice ?? false;
+  const video = caps?.avatarIntake ?? false;
+  const spoken = video || voice;
   return (
     <div className="mx-auto grid max-w-[640px] gap-6">
       <section className="card grid gap-5 p-6">
@@ -50,12 +52,12 @@ export function IntakeEntry() {
         <p className="m-0 text-muted">Tell me about your role and what you want to ask for. We’ll build your practice together.</p>
         <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
           <li className="chip">About 3–4 minutes</li>
-          <li className="chip">{voice ? 'Speak or type' : 'Type your answers'}</li>
+          <li className="chip">{spoken ? 'Speak or type' : 'Type your answers'}</li>
           <li className="chip">No camera</li>
         </ul>
-        {voice && (
+        {spoken && (
           <p className="m-0 text-[14px] leading-5 text-muted">
-            In a voice call your microphone goes to our speech provider so Alex can answer. You confirm every number on screen afterwards.
+            In a {video ? 'video' : 'voice'} call your microphone goes to our {video ? 'video and speech providers' : 'speech provider'} so Alex can answer. You confirm every number on screen afterwards.
           </p>
         )}
         {caps?.voiceAnalysis && (
@@ -65,10 +67,10 @@ export function IntakeEntry() {
           </label>
         )}
         <div className="grid gap-2">
-          <button type="button" className="btn btn-primary btn-xl" disabled={busy !== null} onClick={() => void start(voice ? 'audio' : 'text')}>
+          <button type="button" className="btn btn-primary btn-xl" disabled={busy !== null} onClick={() => void start(video ? 'video' : voice ? 'audio' : 'text')}>
             {busy ? 'Starting…' : 'Start the conversation'}
           </button>
-          {voice && (
+          {spoken && (
             <button type="button" className="btn btn-secondary" disabled={busy !== null} onClick={() => void start('text')}>
               Type instead
             </button>

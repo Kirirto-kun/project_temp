@@ -6,12 +6,14 @@ import { ApiClientError } from '@/client/api/client';
 import type { IntakeView } from '../contracts';
 import { getIntake } from '../client/api';
 import { AudioCoach } from './AudioCoach';
+import { AvatarCoach } from './AvatarCoach';
+import { coachFor, nextFallback, type CoachKind } from './coach-choice';
 import { Review } from './Review';
 import { TextCoach } from './TextCoach';
 
 export function IntakeScreen({ id }: { id: string }) {
   const [view, setView] = useState<IntakeView | null>(null);
-  const [typing, setTyping] = useState(false);
+  const [fallback, setFallback] = useState<CoachKind | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +42,12 @@ export function IntakeScreen({ id }: { id: string }) {
   if (!view) return <p className="text-muted">Loading…</p>;
 
   const reviewing = view.phase === 'review' || view.phase === 'completed';
+  const coach = coachFor(view, fallback);
+  const fallBack = (from: CoachKind, reason: string) => {
+    setNotice(reason);
+    setFallback(nextFallback(view, from));
+    void getIntake(id).then(setView);
+  };
   return (
     <div className="grid gap-4">
       {notice && (
@@ -49,16 +57,10 @@ export function IntakeScreen({ id }: { id: string }) {
       )}
       {reviewing ? (
         <Review view={view} onView={setView} />
-      ) : view.mode === 'audio' && !typing && view.availability.coachVoice ? (
-        <AudioCoach
-          view={view}
-          onView={setView}
-          onFallback={(reason) => {
-            setNotice(reason);
-            setTyping(true);
-            void getIntake(id).then(setView);
-          }}
-        />
+      ) : coach === 'video' ? (
+        <AvatarCoach view={view} onView={setView} onFallback={(reason) => fallBack('video', reason)} onTypeInstead={() => setFallback('text')} />
+      ) : coach === 'audio' ? (
+        <AudioCoach view={view} onView={setView} onFallback={(reason) => fallBack('audio', reason)} />
       ) : (
         <TextCoach view={view} onView={setView} />
       )}
