@@ -6,7 +6,7 @@
 <title>Holdline Brandbook</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
 <style>
   :root {
     --paper: #f4f6f8; --raised: #ffffff; --line: #dce1e7;
@@ -15,9 +15,9 @@
     --won: #0e7a3e; --won-tint: #ddf3e6;
     --gap: #b45309; --gap-tint: #fbebd6;
     --shadow-raise: 0 1px 2px rgba(16,24,32,0.08);
-    --font-display: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
-    --font-sans: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
-    --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    --font-display: "Inter Tight", Inter, "Helvetica Neue", Arial, sans-serif;
+    --font-sans: Inter, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
     --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
     --space-6: 24px; --space-8: 32px; --space-12: 48px; --space-16: 64px;
     --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-pill: 999px;
@@ -79,6 +79,7 @@
   p { max-width: 70ch; }
   .label { font: 600 12px/16px var(--font-sans); letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; }
   .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .num { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
 
   .grid { display: grid; gap: var(--space-4); }
   .g2 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
@@ -112,7 +113,7 @@
   .meter { display: grid; grid-template-columns: 80px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
   .meter .track { height: 8px; border-radius: var(--radius-pill); background: var(--line); overflow: hidden; }
   .meter .fill { height: 100%; }
-  .meter .value { font: 500 18px/24px var(--font-mono); font-variant-numeric: tabular-nums; min-width: 96px; text-align: right; }
+  .meter .value { font: 600 18px/24px var(--font-display); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; min-width: 96px; text-align: right; }
   .up { color: var(--won); } .down { color: var(--gap); }
 
   .chat { display: flex; flex-direction: column; gap: var(--space-4); }
@@ -128,7 +129,7 @@
   .ledger .good .fx { color: var(--won); } .ledger .cost .fx { color: var(--gap); } .ledger .neutral .fx { color: var(--muted); }
   .ledger .nn { font: 500 14px var(--font-mono); color: var(--muted); }
   .ledger .note { font-size: 14px; line-height: 20px; }
-  .figure-xl { font: 500 48px/48px var(--font-mono); color: var(--gap); font-variant-numeric: tabular-nums; margin-top: var(--space-1); }
+  .figure-xl { font: 700 48px/48px var(--font-display); letter-spacing: -0.035em; color: var(--gap); font-variant-numeric: tabular-nums; margin-top: var(--space-1); }
 
   table { border-collapse: collapse; width: 100%; font-size: 14px; }
   th, td { text-align: left; padding: var(--space-3); border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -139,6 +140,124 @@
   code { font: 500 13px var(--font-mono); background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 1px 6px; }
   footer { margin-top: var(--space-16); padding-top: var(--space-6); border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
   @media (prefers-reduced-motion: no-preference) { .meter .fill { transition: width 200ms ease-out; } }
+
+  /* ---------- patterns from the Zimran family ---------- */
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .eyebrow { font: 500 12px/16px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .spec { font-size: 14px; line-height: 20px; color: var(--muted); margin: var(--space-3) 0 0; max-width: 70ch; }
+  h4 { font: 600 18px/24px var(--font-sans); margin: 0; }
+
+  .src-dots { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); margin: var(--space-3) 0; }
+  .src-dots span { display: inline-flex; align-items: center; gap: 6px; font: 500 12px var(--font-mono); color: var(--muted); }
+  .src-dots i { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--line); display: inline-block; }
+  .card p.small { font-size: 14px; line-height: 20px; margin: 0; }
+
+  .tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: var(--radius-sm); font: 600 12px/16px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; color: var(--ink); }
+  .tag::before { content: ""; width: 6px; height: 6px; background: var(--dot); }
+  .tag.adopt { background: var(--won-tint); --dot: var(--won); }
+  .tag.adapt { background: var(--hold-tint); --dot: var(--hold); }
+  .tag.skip { background: var(--gap-tint); --dot: var(--gap); }
+  .tag.later { background: var(--paper); border: 1px solid var(--line); --dot: var(--muted); }
+  table.calls { min-width: 760px; }
+  table.calls td:first-child { font-weight: 600; width: 26%; }
+  table.calls td:nth-child(2) { color: var(--muted); width: 18%; }
+  table.calls td:nth-child(3) { width: 10%; }
+  table.calls tr.grp th { padding-top: var(--space-6); color: var(--ink); }
+
+  .btn.xl { height: 56px; padding: 0 var(--space-6); font-size: 17px; width: 100%; max-width: 480px; }
+  @media (min-width: 561px) { .lp .btn.xl, .band .btn.xl { width: auto; min-width: 200px; } }
+
+  .lp { padding: var(--space-8) var(--space-6); display: grid; gap: var(--space-4); justify-items: start; }
+  .lp-h { font: 700 clamp(34px, 6vw, 56px)/1.06 var(--font-display); letter-spacing: -0.02em; margin: 0; max-width: 17ch; }
+  .lp-sub { margin: 0; color: var(--muted); max-width: 52ch; }
+  .fig-chip { font: 700 0.9em/1 var(--font-display); font-variant-numeric: tabular-nums; letter-spacing: -0.03em; padding: 0.06em 0.22em; border-radius: var(--radius-sm); background: var(--gap-tint); color: var(--gap); white-space: nowrap; }
+  .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .chip { display: inline-flex; align-items: center; height: 32px; padding: 0 var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); font: 500 13px var(--font-sans); color: var(--ink); white-space: nowrap; }
+
+  .win { background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; min-width: 0; box-shadow: var(--shadow-raise); }
+  .win .chrome { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 var(--space-3); border-bottom: 1px solid var(--line); font: 500 12px var(--font-mono); color: var(--muted); }
+  .win .chrome i { width: 6px; height: 6px; background: var(--hold); display: block; }
+  .win .chrome .file { margin-left: var(--space-2); }
+  .win .chrome .n { margin-left: auto; }
+  .win .body { padding: var(--space-4); }
+  .win .body p { margin: var(--space-2) 0 0; color: var(--muted); font-size: 14px; line-height: 20px; }
+
+  .steps { border-top: 1px solid var(--line); }
+  .step { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: var(--space-4); align-items: baseline; padding: var(--space-4) 0; border-bottom: 1px solid var(--line); }
+  .step .no { font: 500 18px/24px var(--font-mono); color: var(--muted); }
+  .step p { margin: var(--space-1) 0 0; color: var(--muted); font-size: 14px; line-height: 20px; }
+  .ck { font: 500 14px var(--font-mono); color: var(--muted); white-space: nowrap; }
+  .ck.done { color: var(--won); }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: var(--space-4); }
+  .stat .fig { font: 700 48px/52px var(--font-display); font-variant-numeric: tabular-nums; letter-spacing: -0.035em; margin-top: var(--space-1); }
+  .stat .src { font-size: 13px; line-height: 18px; color: var(--muted); margin-top: var(--space-2); }
+
+  .ticker { overflow: hidden; border-block: 1px solid var(--line); padding: var(--space-3) 0; }
+  .ticker .track { display: flex; width: max-content; font: 500 13px/20px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .ticker .track span { white-space: nowrap; padding-right: var(--space-8); display: inline-flex; align-items: center; gap: var(--space-3); }
+  .ticker .track span::before { content: ""; width: 6px; height: 6px; background: var(--hold); }
+  @media (prefers-reduced-motion: no-preference) {
+    .ticker .track { animation: tick 48s linear infinite; }
+    .ticker:hover .track { animation-play-state: paused; }
+  }
+  @media (prefers-reduced-motion: reduce) { .ticker .track { width: auto; flex-wrap: wrap; row-gap: var(--space-2); } .ticker .dup { display: none; } }
+  @keyframes tick { to { transform: translateX(-50%); } }
+
+  .band { background: var(--ink); color: var(--paper); border-radius: var(--radius-lg); padding: var(--space-8) var(--space-6); display: grid; gap: var(--space-4); justify-items: start; }
+  .band .eyebrow { color: var(--paper); opacity: 0.8; }
+  .band h4 { font: 700 clamp(28px, 4.5vw, 40px)/1.08 var(--font-display); letter-spacing: -0.015em; max-width: 20ch; }
+
+  .faq { border-top: 1px solid var(--line); }
+  .faq details { border-bottom: 1px solid var(--line); }
+  .faq summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); padding: var(--space-4) 0; font: 600 16px/24px var(--font-sans); }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq .plus { width: 16px; height: 16px; position: relative; flex-shrink: 0; }
+  .faq .plus::before, .faq .plus::after { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: var(--ink); }
+  .faq .plus::after { transform: rotate(90deg); }
+  .faq details[open] .plus::after { transform: rotate(0deg); }
+  .faq details p { margin: 0 0 var(--space-4); color: var(--muted); }
+  @media (prefers-reduced-motion: no-preference) { .faq .plus::after { transition: transform 200ms ease-out; } }
+
+  .flowmap { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; font: 500 13px var(--font-mono); color: var(--muted); margin: 0 0 var(--space-6); padding: 0; list-style: none; }
+  .flowmap li { display: inline-flex; align-items: center; gap: var(--space-2); }
+  .flowmap li + li::before { content: "→"; }
+  .flowmap span { padding: 4px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--raised); color: var(--ink); }
+
+  .flow { display: flex; gap: var(--space-4); overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: var(--space-3); }
+  .screen { flex: 0 0 252px; scroll-snap-align: start; display: flex; flex-direction: column; gap: var(--space-2); }
+  .screen .cap { font: 500 12px/16px var(--font-mono); color: var(--muted); }
+  .phone { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; padding: var(--space-4) var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); min-height: 492px; }
+  .phone h5 { font: 700 22px/26px var(--font-display); letter-spacing: -0.01em; margin: 0; }
+  .phone .sub { font-size: 14px; line-height: 20px; color: var(--muted); margin: 0; }
+  .phone .pbar { display: flex; align-items: center; gap: var(--space-3); font: 500 12px var(--font-mono); color: var(--muted); }
+  .phone .pbar .track { flex: 1; height: 4px; border-radius: var(--radius-pill); background: var(--line); overflow: hidden; }
+  .phone .pbar .track div { height: 100%; background: var(--hold); }
+  .phone .foot { margin-top: auto; display: grid; gap: var(--space-2); }
+  .phone .btn { width: 100%; height: 52px; }
+  .phone .fine { font-size: 12px; line-height: 16px; color: var(--muted); text-align: center; margin: 0; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+  .tile { background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-3); display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-4); min-height: 112px; font: 600 14px/18px var(--font-sans); }
+  .glyph { display: flex; flex-direction: column; gap: 4px; }
+  .glyph div { height: 6px; border-radius: 2px; }
+  .opts { display: grid; gap: var(--space-2); }
+  .opt { display: flex; align-items: center; min-height: 52px; padding: var(--space-2) var(--space-4); background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-md); font: 500 15px/20px var(--font-sans); }
+  .opt.on { border-color: var(--hold); background: var(--hold-tint); }
+  .coach { background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-4); display: grid; gap: var(--space-2); }
+  .coach .big { font: 700 20px/26px var(--font-display); margin: 0; }
+  .checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); font-size: 14px; line-height: 20px; }
+  .checklist li { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: var(--space-2); }
+  .mb { display: grid; gap: var(--space-3); }
+  .mb .l { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-1); }
+  .mb .l .mono { font-size: 14px; }
+  .mb .b { height: 24px; border-radius: var(--radius-sm); }
+  .kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2) var(--space-3); font-size: 14px; line-height: 20px; margin: 0; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; text-align: right; }
+  .plan { border: 1px solid var(--line); background: var(--raised); border-radius: var(--radius-md); padding: var(--space-3); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px var(--space-2); }
+  .plan.on { border-color: var(--hold); box-shadow: inset 0 0 0 1px var(--hold); background: var(--hold-tint); }
+  .plan b { font: 600 15px/20px var(--font-sans); }
+  .plan .p { font: 500 15px/20px var(--font-mono); }
+  .plan .r { grid-column: 1 / -1; font-size: 12px; line-height: 16px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -147,7 +266,7 @@
   <div class="in">
     <b>Holdline</b>
     <nav>
-      <a href="#idea">Idea</a><a href="#color">Colour</a><a href="#type">Type</a><a href="#shape">Shape</a><a href="#components">Components</a><a href="#voice">Voice</a><a href="#stack">UI stack</a><a href="#rules">Rules</a>
+      <a href="#idea">Idea</a><a href="#color">Colour</a><a href="#type">Type</a><a href="#shape">Shape</a><a href="#components">Components</a><a href="#patterns">Patterns</a><a href="#landing">Landing</a><a href="#funnel">Funnel</a><a href="#voice">Voice</a><a href="#stack">UI stack</a><a href="#rules">Rules</a>
     </nav>
     <button id="theme" type="button" aria-label="Toggle theme">Theme: auto</button>
   </div>
@@ -157,6 +276,7 @@
 
   <div class="hero">
     <div>
+      <div class="eyebrow" style="margin-bottom: var(--space-3)">Brandbook · v2</div>
       <h1>Holdline</h1>
       <p>Rehearse the conversation before it costs you.</p>
     </div>
@@ -205,7 +325,7 @@
 
   <section id="type">
     <h2>Type</h2>
-    <p class="lead">Bricolage Grotesque for display, Instrument Sans for text, IBM Plex Mono for every money figure so digits line up (<code>font-variant-numeric: tabular-nums</code>). All three come from Google Fonts.</p>
+    <p class="lead">Inter Tight for display, Inter for text, Inter Tight with tabular figures for every money figure so digits line up; JetBrains Mono for code and small labels (<code>font-variant-numeric: tabular-nums</code>). All three come from Google Fonts.</p>
     <div>
       <div class="specimen"><span class="k">display-xl · 64/60 · 700</span><span style="font: 700 64px/60px var(--font-display); letter-spacing: -0.02em">Hold the line.</span></div>
       <div class="specimen"><span class="k">display-l · 40/42 · 700</span><span style="font: 700 40px/42px var(--font-display); letter-spacing: -0.015em">You left $8,000 on the table.</span></div>
@@ -213,8 +333,9 @@
       <div class="specimen"><span class="k">body · 16/24 · 400</span><span>Budget is frozen until next quarter.</span></div>
       <div class="specimen"><span class="k">body-s · 14/20 · 400</span><span style="font-size:14px;line-height:20px">Patience drops when you repeat the same number.</span></div>
       <div class="specimen"><span class="k">label · 12/16 · 600 · +0.06em</span><span class="label">Patience</span></div>
-      <div class="specimen"><span class="k">figure-xl · 48/48 · mono 500</span><span class="mono" style="font-size:48px;line-height:48px">$8,000</span></div>
-      <div class="specimen"><span class="k">figure · 18/24 · mono 500</span><span class="mono" style="font-size:18px;line-height:24px">$104,000</span></div>
+      <div class="specimen"><span class="k">eyebrow · 12/16 · mono 500 · +0.08em</span><span class="eyebrow">Negotiation simulator</span></div>
+      <div class="specimen"><span class="k">figure-xl · 48/48 · display 700 · −0.035em · tnum</span><span class="num" style="font-size:48px;line-height:48px;font-weight:700;letter-spacing:-0.035em">$8,000</span></div>
+      <div class="specimen"><span class="k">figure · 18/24 · display 600 · tnum</span><span class="num" style="font-size:18px;line-height:24px;font-weight:600">$104,000</span></div>
     </div>
   </section>
 
@@ -239,10 +360,9 @@
       <div style="border-radius:12px">lg · 12</div>
       <div style="border-radius:999px">pill</div>
     </div>
-    <p style="margin-top: var(--space-3)" class="lead">Pill radius is for meter tracks and status pills only. Motion: two things move, the typing indicator and meter changes (200ms ease-out). Respect <code>prefers-reduced-motion</code>. No page-load choreography.</p>
+    <p style="margin-top: var(--space-3)" class="lead">Pill radius is for meter tracks, progress tracks and status pills only. Motion has a job: the typing indicator, meter changes and the FAQ plus (200ms ease-out), and the moves strip on the landing (slow, pauses on hover). Respect <code>prefers-reduced-motion</code>: the strip stops and wraps. No page-load choreography.</p>
     <h3>Imagery and icons</h3>
-    <p>Counterpart avatars in the negotiation catalog are flat illustrations in one style, in <code>hold-tint</code>, <code>gap-tint</code> and <code>ink</code>. No generated photoreal faces in that catalog. Icons are Lucide at 1.5px stroke, 20px, in <code>ink</code> or <code>muted</code>. No emoji as icons.</p>
-    <p>The introductory call has one explicit exception: a licensed digital host, or one made with the depicted person's consent, may appear as live video. Keep an <strong>AI coach</strong> label visible. The host is composed, attentive and professional; no intimidation, fake employer identity or emotion scores. The call uses the same flat UI, typography and accessible controls. Camera use is optional.</p>
+    <p>Counterpart avatars are flat illustrations in one style, in <code>hold-tint</code>, <code>gap-tint</code> and <code>ink</code>. No generated photoreal faces. Icons are Lucide at 1.5px stroke, 20px, in <code>ink</code> or <code>muted</code>. No emoji as icons.</p>
   </section>
 
   <section id="components">
@@ -286,6 +406,257 @@
     </div>
   </section>
 
+  <section id="patterns">
+    <div class="eyebrow" style="margin-bottom: var(--space-2)">Read 2026-11-14 · businesscup.zimran.io · zimran.io · coursiv.io</div>
+    <h2>Patterns from Zimran</h2>
+    <p class="lead">Zimran builds consumer subscription products, Coursiv among them. Holdline sells the same way: quiz, plan, paywall. So we read three of their sites and took the structure, not the look. Every pattern gets one call. <b>Adopt</b>: use it as is, in our tokens. <b>Adapt</b>: keep its job, change its form. <b>Skip</b>: it breaks our voice or our rules.</p>
+
+    <div class="grid g3">
+      <div class="card">
+        <div class="label">Business Cup 2.0 · event landing</div>
+        <div class="src-dots" aria-label="Their colours, for reference only">
+          <span><i style="background:#000000"></i>#000000</span><span><i style="background:#5B42DC"></i>#5B42DC</span><span><i style="background:#BAFF3B"></i>#BAFF3B</span><span><i style="background:#7367FF"></i>#7367FF</span>
+        </div>
+        <p class="small">Black ground. White UpMax in caps. JetBrains Mono for code jokes: <code>crack_the_case.md</code>, <code>&lt;/2.0&gt;</code>, <code>[ ]</code>. Square 3px corners. Cards have a 36px window title bar. Stats are 80px. One CTA, "Apply now", appears six times, and the main one is 89px tall.</p>
+      </div>
+      <div class="card">
+        <div class="label">Zimran · company site</div>
+        <div class="src-dots" aria-label="Their colours, for reference only">
+          <span><i style="background:#5B42DC"></i>#5B42DC</span><span><i style="background:#000000"></i>#000000</span><span><i style="background:#FFFFFF"></i>#FFFFFF</span>
+        </div>
+        <p class="small">Violet ground with black and white blocks. The headline has photos set inside the line. Values all repeat one word: Extra Obsessed, Extra Curiosity, Extra GTD. A scrolling ticker runs between sections. People are shown by first name and role.</p>
+      </div>
+      <div class="card">
+        <div class="label">Coursiv · landing and funnel</div>
+        <div class="src-dots" aria-label="Their colours, for reference only">
+          <span><i style="background:#100018"></i>#100018</span><span><i style="background:#331E3E"></i>#331E3E</span><span><i style="background:#5653FE"></i>#5653FE</span><span><i style="background:#FFB800"></i>#FFB800</span>
+        </div>
+        <p class="small">Dark plum landing: Inter with a serif accent, 8 to 16px radii, 48 to 56px buttons that go full width on phones. Logo wall, stats with sources, 3 steps, tool cards with chips, reviews, FAQ, and billing links in the nav. The funnel switches to light: a picture-card question, social proof, "your plan is ready", an offer with old and new prices, a money-back guarantee, an exit discount and a gift upsell.</p>
+      </div>
+    </div>
+    <p class="spec">Hex values are theirs and are shown for reference only. Never use them in Holdline.</p>
+
+    <h3>Shared by all three</h3>
+    <ul class="clean">
+      <li>A dark marketing ground with one saturated accent.</li>
+      <li>A short promise, and one CTA label repeated down the page.</li>
+      <li>Proof as big numbers.</li>
+      <li>Numbered steps that explain the format.</li>
+      <li>An FAQ just above the footer.</li>
+      <li>A moving strip of words or logos.</li>
+    </ul>
+
+    <h3>Pattern calls</h3>
+    <div class="scroll">
+      <table class="calls">
+        <thead><tr><th>Pattern</th><th>Seen on</th><th>Call</th><th>In Holdline</th></tr></thead>
+        <tbody>
+          <tr class="grp"><th colspan="4">Landing</th></tr>
+          <tr><td>Hero with eyebrow, short promise, one CTA and fact chips</td><td>Cup, Coursiv</td><td><span class="tag adopt">Adopt</span></td><td>Mono eyebrow, a headline under ten words, one "Start" button, at most three chips of plain fact.</td></tr>
+          <tr><td>Objects set inside the headline</td><td>Zimran</td><td><span class="tag adapt">Adapt</span></td><td>One mono money chip in <code>gap</code> instead of photos.</td></tr>
+          <tr><td>One CTA label, repeated</td><td>Cup ("Apply now" ×6), Coursiv</td><td><span class="tag adopt">Adopt</span></td><td>"Start" in the hero, after the steps and in the closing band. The same word every time.</td></tr>
+          <tr><td>Big CTA, full width on phones</td><td>Cup 89px, Coursiv 56px</td><td><span class="tag adopt">Adopt</span></td><td><code>btn-xl</code>: 56px high, full width below 560px, at most 480px wide.</td></tr>
+          <tr><td>Window title bar on cards</td><td>Cup</td><td><span class="tag adapt">Adapt</span></td><td>Mono log name and step number, two 6px <code>hold</code> squares. Only on cards that hold a record.</td></tr>
+          <tr><td>Numbered schedule with checkboxes</td><td>Cup, Coursiv "How it works"</td><td><span class="tag adapt">Adapt</span></td><td>01 to 04 in mono, with <code>[x]</code> in <code>won</code> for done steps.</td></tr>
+          <tr><td>Big stats</td><td>Cup, Zimran</td><td><span class="tag adapt">Adapt</span></td><td>Mono figure. Every stat on the landing has a source line. Inside the app the stats are the user's own.</td></tr>
+          <tr><td>Moving strip</td><td>Zimran ticker, Coursiv logo wall</td><td><span class="tag adapt">Adapt</span></td><td>Move names, not logos. Pauses on hover. Static with reduced motion.</td></tr>
+          <tr><td>Repeated closing CTA band</td><td>Coursiv, Cup</td><td><span class="tag adopt">Adopt</span></td><td>One inverted <code>ink</code> band before the FAQ.</td></tr>
+          <tr><td>FAQ accordion with a plus</td><td>Cup, Coursiv</td><td><span class="tag adopt">Adopt</span></td><td>Native <code>details</code>. Billing questions sit next to product questions.</td></tr>
+          <tr><td>Billing links in nav and footer</td><td>Coursiv</td><td><span class="tag adopt">Adopt</span></td><td>"Cancel subscription" and "Why was I charged?" in the footer and the account menu.</td></tr>
+          <tr><td>Reviews in tabs</td><td>Coursiv</td><td><span class="tag later">Later</span></td><td>Only real quotes with a name and a date. None at launch.</td></tr>
+          <tr><td>"Limited spots, claim yours now!"</td><td>Cup</td><td><span class="tag skip">Skip</span></td><td>No scarcity, no exclamation marks.</td></tr>
+
+          <tr class="grp"><th colspan="4">Funnel</th></tr>
+          <tr><td>First screen is a picture-card question</td><td>Coursiv</td><td><span class="tag adopt">Adopt</span></td><td>"What are you negotiating?" Four tiles. Tap to continue.</td></tr>
+          <tr><td>One question per screen with progress</td><td>Coursiv</td><td><span class="tag adopt">Adopt</span></td><td>4px <code>hold</code> track and "3 / 7" in mono. Single choice moves on tap.</td></tr>
+          <tr><td>Social-proof screen ("Join over 2,000,000 users")</td><td>Coursiv</td><td><span class="tag adapt">Adapt</span></td><td>A coach note: one tactic the user will try in this round. Show a user count only when it is live and real.</td></tr>
+          <tr><td>"Your plan is ready" with goal and target</td><td>Coursiv</td><td><span class="tag adopt">Adopt</span></td><td>"Your round is ready": target, walk-away and counterpart, drawn as offer bars.</td></tr>
+          <tr><td>Paywall straight after the plan</td><td>Coursiv</td><td><span class="tag adapt">Adapt</span></td><td>One free round comes first. The paywall sits on "Replay this round", after the first debrief. The gap figure is the reason to pay.</td></tr>
+          <tr><td>Old and new price, money-back block</td><td>Coursiv</td><td><span class="tag adapt">Adapt</span></td><td>Strike a price through only if we really charged it. Show the renewal price under every plan. Show a guarantee only if the policy exists.</td></tr>
+          <tr><td>Exit discount sheet, gift-box upsell, "Boom!"</td><td>Coursiv</td><td><span class="tag skip">Skip</span></td><td>These are pressure patterns, and they are not our voice.</td></tr>
+
+          <tr class="grp"><th colspan="4">Look</th></tr>
+          <tr><td>Dark marketing ground</td><td>All three</td><td><span class="tag adopt">Adopt</span></td><td>The landing uses our dark theme. Quiz to paywall run light, as Coursiv's funnel does. Session and debrief follow the system setting.</td></tr>
+          <tr><td>One brand word, repeated ("Extra …")</td><td>Zimran</td><td><span class="tag adapt">Adapt</span></td><td>"Hold": hold the line, hold your number. At most once per screen.</td></tr>
+          <tr><td>Code punctuation as ornament</td><td>Cup</td><td><span class="tag adapt">Adapt</span></td><td>Mono is for figures, labels, file names and <code>[x]</code> checks. No fake code in headlines.</td></tr>
+          <tr><td>All-caps display type</td><td>Cup</td><td><span class="tag skip">Skip</span></td><td>Our display type is sentence case. Caps only in 12px labels and eyebrows.</td></tr>
+          <tr><td>Violet, lime, UpMax, pixel type, mascots</td><td>Cup, Zimran</td><td><span class="tag skip">Skip</span></td><td>These are theirs. We use <code>hold</code>, Inter Tight, Inter and JetBrains Mono.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="landing">
+    <h2>Landing kit</h2>
+    <p class="lead">Blocks in the order all three sites share: hero, how it works, proof, moves strip, closing band, FAQ. The landing uses the dark theme. Use the theme switch above to check both.</p>
+
+    <h3>Hero</h3>
+    <div class="card lp">
+      <div class="eyebrow">Negotiation simulator</div>
+      <p class="lp-h">Rehearse the raise before it costs you <span class="fig-chip">$8,000</span></p>
+      <p class="lp-sub">Play the conversation against a counterpart who does not give in for free. Then see which move left money on the table.</p>
+      <button class="btn primary xl" type="button">Start</button>
+      <div class="chips"><span class="chip">Raise · offer · rent · bills</span><span class="chip">Plays in the browser</span><span class="chip">Debrief after every round</span></div>
+    </div>
+    <p class="spec">Mono eyebrow. A headline under ten words, with at most one figure chip. One button, then up to three chips of plain fact. The chips come from Cup's hero badges, the figure chip from Zimran's headline with objects inside it.</p>
+
+    <h3>How it works: window cards</h3>
+    <div class="grid g3">
+      <div class="win"><div class="chrome" aria-hidden="true"><i></i><i></i><span class="file">setup.log</span><span class="n">01</span></div><div class="body"><h4>Pick the conversation</h4><p>A raise, an offer, rent or a bill. Enter your range.</p></div></div>
+      <div class="win"><div class="chrome" aria-hidden="true"><i></i><i></i><span class="file">round.log</span><span class="n">02</span></div><div class="body"><h4>Play it out</h4><p>Your counterpart objects, stalls and tests you. Trust and patience move with every reply.</p></div></div>
+      <div class="win"><div class="chrome" aria-hidden="true"><i></i><i></i><span class="file">debrief.log</span><span class="n">03</span></div><div class="body"><h4>See the gap</h4><p>Where you stopped against your range, and the move that cost the most.</p></div></div>
+    </div>
+    <p class="spec">Title bar: 32px, mono 12px in <code>muted</code>, two 6px <code>hold</code> squares, file name on the left, step number on the right. Taken from Cup's <code>crack_the_case.md</code> cards. Use it only for things that are records: a round, a transcript, a debrief.</p>
+
+    <h3>Steps with checks</h3>
+    <div class="steps">
+      <div class="step"><span class="no">01</span><div><h4>Answer seven questions</h4><p>What you are negotiating, your range, and how it went last time.</p></div><span class="ck done"><span aria-hidden="true">[x]</span><span class="sr">done</span></span></div>
+      <div class="step"><span class="no">02</span><div><h4>Get your round</h4><p>A target, a walk-away and a counterpart, set from your answers.</p></div><span class="ck done"><span aria-hidden="true">[x]</span><span class="sr">done</span></span></div>
+      <div class="step"><span class="no">03</span><div><h4>Play it</h4><p>Type your replies. Your counterpart answers in role.</p></div><span class="ck"><span aria-hidden="true">[ ]</span><span class="sr">to do</span></span></div>
+      <div class="step"><span class="no">04</span><div><h4>Read the debrief, then replay</h4><p>The ledger shows each move and what it did.</p></div><span class="ck"><span aria-hidden="true">[ ]</span><span class="sr">to do</span></span></div>
+    </div>
+    <p class="spec">From Cup's schedule and Coursiv's "How it works". Mono numbers, a 1px rule between rows, and <code>[x]</code> in <code>won</code> once a step is done. The same block becomes the progress list inside the app.</p>
+
+    <h3>Proof in numbers</h3>
+    <div class="stats">
+      <div class="stat"><div class="label">Left on the table · round 1</div><div class="fig" style="color: var(--gap)">$8,000</div><div class="src">Against your range.</div></div>
+      <div class="stat"><div class="label">Left on the table · round 3</div><div class="fig" style="color: var(--gap)">$2,000</div><div class="src">Same counterpart, new opening.</div></div>
+      <div class="stat"><div class="label">Recovered across replays</div><div class="fig" style="color: var(--won)">+$6,000</div><div class="src">Your rounds only.</div></div>
+    </div>
+    <p class="spec">Cup and Zimran lead with big numbers. In the app, the numbers are the user's own rounds. On the landing a stat needs a named source and year printed under it, as Coursiv does. If there is no source, there is no stat.</p>
+
+    <h3>Moves strip</h3>
+    <div class="ticker">
+      <p class="sr">Moves you practise: anchor first, give a reason, ask why, trade instead of conceding, let silence work, name the range, bracket, get it in writing.</p>
+      <div class="track" aria-hidden="true">
+        <span>Anchor first</span><span>Give a reason</span><span>Ask why</span><span>Trade, don't concede</span><span>Let silence work</span><span>Name the range</span><span>Bracket</span><span>Get it in writing</span>
+        <span class="dup">Anchor first</span><span class="dup">Give a reason</span><span class="dup">Ask why</span><span class="dup">Trade, don't concede</span><span class="dup">Let silence work</span><span class="dup">Name the range</span><span class="dup">Bracket</span><span class="dup">Get it in writing</span>
+      </div>
+    </div>
+    <p class="spec">Zimran's ticker and Coursiv's logo wall, filled with the moves we teach instead of logos we have no right to. 48 seconds per loop, pauses on hover, and stops and wraps with reduced motion.</p>
+
+    <h3>Closing band</h3>
+    <div class="band">
+      <div class="eyebrow">Your next money conversation</div>
+      <h4>Rehearse it before it costs you.</h4>
+      <button class="btn primary xl" type="button">Start</button>
+    </div>
+    <p class="spec">Coursiv repeats its CTA block twice and Cup closes on one. We close once: an <code>ink</code> band in reversed colours, with the same "Start" label as the hero.</p>
+
+    <h3>FAQ</h3>
+    <div class="faq">
+      <details open><summary>Is the counterpart a real person?<span class="plus" aria-hidden="true"></span></summary><p>No. It is a simulation. Its ceiling is a scenario setting taken from the range you enter.</p></details>
+      <details><summary>How is "left on the table" worked out?<span class="plus" aria-hidden="true"></span></summary><p>It is the distance between where you stopped and the ceiling of the scenario. It is measured against your range. It does not predict what anyone would pay.</p></details>
+      <details><summary>How do I cancel?<span class="plus" aria-hidden="true"></span></summary><p>In Settings, under Subscription. The link is also in the footer of every page.</p></details>
+      <details><summary>Why was I charged?<span class="plus" aria-hidden="true"></span></summary><p>Settings lists the date, the plan and the amount of each charge. The renewal price was shown before you paid.</p></details>
+    </div>
+    <p class="spec">As on Cup and Coursiv: a hairline list with a plus that turns into a minus. Billing questions are not hidden in a help centre.</p>
+  </section>
+
+  <section id="funnel">
+    <h2>Funnel</h2>
+    <p class="lead">Coursiv's order, with our manners. Each screen has one job and one button. The funnel runs on the light theme. One change from Coursiv: the first round is free, and the paywall comes after the first debrief.</p>
+    <ol class="flowmap" aria-label="Funnel order">
+      <li><span>Landing</span></li><li><span>Entry</span></li><li><span>Quiz ×6</span></li><li><span>Coach note</span></li><li><span>Setup</span></li><li><span>Your round</span></li><li><span>Session, free</span></li><li><span>Debrief</span></li><li><span>Paywall</span></li><li><span>Replay</span></li>
+    </ol>
+
+    <div class="flow" tabindex="0" aria-label="Funnel screens, scroll sideways">
+      <div class="screen">
+        <div class="phone">
+          <div class="eyebrow">Holdline</div>
+          <h5>What are you negotiating?</h5>
+          <p class="sub">Pick one. You can change it later.</p>
+          <div class="tiles">
+            <div class="tile"><div class="glyph" aria-hidden="true"><div style="width:90%;background:var(--ink)"></div><div style="width:70%;background:var(--hold)"></div></div>A raise</div>
+            <div class="tile"><div class="glyph" aria-hidden="true"><div style="width:75%;background:var(--ink)"></div><div style="width:60%;background:var(--hold)"></div></div>A job offer</div>
+            <div class="tile"><div class="glyph" aria-hidden="true"><div style="width:60%;background:var(--ink)"></div><div style="width:45%;background:var(--hold)"></div></div>Rent</div>
+            <div class="tile"><div class="glyph" aria-hidden="true"><div style="width:50%;background:var(--ink)"></div><div style="width:30%;background:var(--hold)"></div></div>A bill or rate</div>
+          </div>
+        </div>
+        <div class="cap">01 · Entry: picture-card question</div>
+      </div>
+
+      <div class="screen">
+        <div class="phone">
+          <div class="pbar"><span aria-hidden="true">‹</span><div class="track"><div style="width:43%"></div></div><span>3 / 7</span></div>
+          <h5>Last time, who named a number first?</h5>
+          <div class="opts">
+            <div class="opt">I did</div>
+            <div class="opt on">They did</div>
+            <div class="opt">Nobody named one</div>
+            <div class="opt">I haven't had this talk yet</div>
+          </div>
+        </div>
+        <div class="cap">02 · Quiz: one question, tap moves on</div>
+      </div>
+
+      <div class="screen">
+        <div class="phone">
+          <div class="pbar"><span aria-hidden="true">‹</span><div class="track"><div style="width:57%"></div></div><span>4 / 7</span></div>
+          <div class="coach">
+            <div class="label">Coach note</div>
+            <p class="big">The first number sets the range for the whole talk.</p>
+            <p class="sub">In this round you open first. The debrief shows what that number did.</p>
+          </div>
+          <div class="foot"><button class="btn primary" type="button">Continue</button></div>
+        </div>
+        <div class="cap">03 · Coach note, in place of social proof</div>
+      </div>
+
+      <div class="screen">
+        <div class="phone">
+          <h5>Setting up your round</h5>
+          <div class="pbar"><div class="track"><div style="width:75%"></div></div><span>3 / 4</span></div>
+          <ul class="checklist">
+            <li><span class="ck done">[x]</span><span>Counterpart: your manager</span></li>
+            <li><span class="ck done">[x]</span><span>Ceiling set inside your range</span></li>
+            <li><span class="ck done">[x]</span><span>Patience starts at <span class="mono">60</span></span></li>
+            <li><span class="ck">[ ]</span><span>First objection</span></li>
+          </ul>
+        </div>
+        <div class="cap">04 · Setup: lists only what is really set</div>
+      </div>
+
+      <div class="screen">
+        <div class="phone">
+          <div class="eyebrow">Your round is ready</div>
+          <h5>A raise, with your manager</h5>
+          <div class="mb">
+            <div><div class="l"><span class="label">Your target</span><span class="mono">$112,000</span></div><div class="b" style="width:92%;background:var(--hold)"></div></div>
+            <div><div class="l"><span class="label">Your walk-away</span><span class="mono">$100,000</span></div><div class="b" style="width:72%;background:var(--muted)"></div></div>
+          </div>
+          <dl class="kv"><dt>They open with</dt><dd>"Budget is frozen"</dd><dt>Ceiling</dt><dd>Hidden until the debrief</dd></dl>
+          <div class="foot"><button class="btn primary" type="button">Start the round</button><p class="fine">The first round is free.</p></div>
+        </div>
+        <div class="cap">05 · Your round: Coursiv's plan-ready screen</div>
+      </div>
+
+      <div class="screen">
+        <div class="phone">
+          <div class="label" style="color: var(--gap)">Round 1 · <span class="mono">$8,000</span> left</div>
+          <h5>Replay this round</h5>
+          <p class="sub">Same counterpart, same range. Try a different move at turn 4.</p>
+          <div class="plan"><b>Weekly</b><span class="p">$4.99</span><span class="r">Renews at $4.99 each week</span></div>
+          <div class="plan on"><b>Monthly</b><span class="p">$12.99</span><span class="r">Renews at $12.99 each month</span></div>
+          <div class="foot"><button class="btn primary" type="button">Continue</button><p class="fine">Cancel any time in Settings.</p></div>
+        </div>
+        <div class="cap">06 · Paywall, after the debrief</div>
+      </div>
+    </div>
+    <p class="spec">Prices are placeholders. Scroll sideways to see all six screens.</p>
+
+    <h3>Funnel rules</h3>
+    <ol class="clean">
+      <li>One question per screen. Single choice moves on tap. Multiple choice shows "Continue".</li>
+      <li>Progress is a 4px <code>hold</code> track with "3 / 7" in mono. A back arrow is always there.</li>
+      <li>Between questions, screens teach a tactic. They do not count users. A user count must be live and real.</li>
+      <li>The setup screen lists only what the round really sets. No progress bar padded for effect.</li>
+      <li>Funnel buttons are 52 to 56px high, full width, and pinned to the bottom on phones.</li>
+      <li>Every plan shows its renewal price. Strike a price through only if we charged it before. One plan is preselected and labelled as such.</li>
+      <li>No exit discount, gift box, countdown or "today only".</li>
+    </ol>
+  </section>
+
   <section id="voice">
     <h2>Voice</h2>
     <p class="lead">Direct, calm, a little dry. A coach who has seen this conversation fifty times and does not flatter.</p>
@@ -293,7 +664,8 @@
       <li>Talk to the user as "you". Name the counterpart by role ("your manager"), never "the AI".</li>
       <li>Lead with the number. "You stopped at $104,000. The ceiling was $112,000."</li>
       <li>Say what a move did. Name the move type, then the fix.</li>
-      <li>Buttons are verbs: "Start", "Replay this round", "See the debrief".</li>
+      <li>Buttons are verbs: "Start", "Replay this round", "See the debrief". The landing repeats one label, "Start". The quiz uses "Continue".</li>
+      <li>One brand word, the way Zimran uses "Extra": hold. "Hold the line", "Hold your number". At most once per screen.</li>
       <li>No exclamation marks, no emoji, no "unlock", no "supercharge", no fear copy.</li>
       <li>Be honest about the simulation. The ceiling is a scenario setting from the range the user entered. Say "against your range", never "your boss would have paid".</li>
     </ul>
@@ -304,6 +676,8 @@
           <tr><td>You asked for $108,000 and gave no reason.</td><td>Oops! Try to be more confident.</td></tr>
           <tr><td>Left on the table: $8,000</td><td>You lost out big time.</td></tr>
           <tr><td>Replay this round</td><td>Try again!</td></tr>
+          <tr><td>Your round is ready</td><td>Boom! Your plan is unlocked!</td></tr>
+          <tr><td>Renews at $12.99 each month</td><td>Only today: 60% off. Offer ends in 09:59</td></tr>
         </tbody>
       </table>
     </div>
@@ -321,10 +695,11 @@
     </ul>
     <h3>Pages, in build order</h3>
     <ol class="clean">
-      <li>Quiz: one question per screen with a progress track.</li>
-      <li>Session: chat plus the two meters.</li>
+      <li>Quiz: entry tiles, one question per screen, coach note, setup, "Your round". See <a href="#funnel">Funnel</a>.</li>
+      <li>Session: chat plus the two meters. The first round is free.</li>
       <li>Debrief: offer bar, ledger, "Replay this round".</li>
-      <li>Pricing: plain, no countdowns, trial and renewal prices shown before payment.</li>
+      <li>Paywall: opens from "Replay this round". Plain, no countdowns, with trial and renewal prices shown before payment.</li>
+      <li>Landing: hero, window cards, steps, moves strip, closing band, FAQ. See <a href="#landing">Landing kit</a>.</li>
     </ol>
   </section>
 
@@ -337,19 +712,22 @@
       <li>Money figures use the mono face. Gains are <code>won</code> with a plus, gaps are <code>gap</code> with the word "left".</li>
       <li>Focus ring: 2px <code>hold</code> outline, 2px offset, on every interactive element.</li>
       <li>Check contrast in both themes. Text is at least 4.5:1.</li>
+      <li>The landing uses the dark theme. Quiz to paywall run light. Session and debrief follow the system setting.</li>
+      <li>Window title bars only go on records: a round, a transcript, a debrief.</li>
     </ol>
     <h3>Avoid</h3>
     <ul class="clean">
       <li>A purple or blue gradient hero, or a glossy gradient button.</li>
       <li>Inter or Space Grotesk as the "safe" face.</li>
       <li>Emoji cards, and accent bars on the left edge of rounded cards.</li>
-      <li>A generated photoreal face for a negotiation catalog counterpart. The disclosed introductory AI coach is the separate exception above.</li>
+      <li>A generated photoreal face for the counterpart.</li>
       <li>Countdown timers, "only 3 spots" and other pressure patterns.</li>
-      <li>Copying Coursiv's or Zimran's marks, colours or mascot. Learn from the quiz, plan, paywall order, not the look.</li>
+      <li>Exit-intent discounts, gift-box upsells and "Boom!" reveals.</li>
+      <li>Copying Zimran-family marks, colours (violet <code>#5B42DC</code>, lime <code>#BAFF3B</code>), UpMax, pixel type or mascots. Take the structure. See <a href="#patterns">Patterns from Zimran</a>.</li>
     </ul>
   </section>
 
-  <footer>Holdline brandbook · v1 · 2026-11-14</footer>
+  <footer>Holdline brandbook · v2 · 2026-11-14 · Patterns read from businesscup.zimran.io, zimran.io and coursiv.io</footer>
 </main>
 
 <script>
