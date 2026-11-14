@@ -22,12 +22,29 @@ async function loadVerified(url: string, expected: string | undefined): Promise<
   return new Uint8Array(buf)
 }
 
+type FactoryScope = { ModuleFactory?: unknown }
+
+/**
+ * MediaPipe's module loader sets `self.ModuleFactory` when its script first runs, and each
+ * `createFromOptions` clears it afterwards. ES modules execute once per realm, so the second
+ * landmarker (or the CPU retry) would find it unset. Import the loader ourselves once and put
+ * the factory back before every create.
+ */
+async function loadModuleFactory(loaderPath: string): Promise<() => void> {
+  const mod = (await import(/* @vite-ignore */ loaderPath)) as { default?: unknown }
+  const factory = mod.default ?? (globalThis as FactoryScope).ModuleFactory
+  if (typeof factory !== 'function') throw new Error('vision: wasm loader exported no ModuleFactory')
+  return () => { (globalThis as FactoryScope).ModuleFactory = factory }
+}
+
 /** GPU first; some browsers (notably Safari in workers) only manage CPU. */
-async function withGpuFallback<T>(create: (delegate: 'GPU' | 'CPU') => Promise<T>): Promise<T> {
+async function withGpuFallback<T>(restoreFactory: () => void, create: (delegate: 'GPU' | 'CPU') => Promise<T>): Promise<T> {
   try {
+    restoreFactory()
     return await create('GPU')
   } catch (err) {
     console.warn('vision: GPU delegate failed, using CPU', err)
+    restoreFactory()
     return create('CPU')
   }
 }
@@ -38,18 +55,19 @@ export async function createInference(o: InferenceOptions): Promise<Inference> {
   const manifest = (await manifestRes.json()) as Record<string, string>
   const model = (file: string) => loadVerified(`${o.assetBase}/models/${file}`, manifest[file])
   const fileset = await FilesetResolver.forVisionTasks(`${o.assetBase}/wasm`, true)
+  const restoreFactory = await loadModuleFactory(new URL(fileset.wasmLoaderPath, self.location.href).href)
 
   // Close any landmarker already created if a later step throws, so a failed init leaks no WASM heap.
   const made: { close(): void }[] = []
   try {
     const poseModel = await model(MODEL_FILES.pose[o.tier])
-    const pose = await withGpuFallback((delegate) => PoseLandmarker.createFromOptions(fileset, {
+    const pose = await withGpuFallback(restoreFactory, (delegate) => PoseLandmarker.createFromOptions(fileset, {
       baseOptions: { modelAssetBuffer: poseModel, delegate }, runningMode: 'VIDEO', numPoses: 2,
       minPoseDetectionConfidence: MIN_CONFIDENCE, minPosePresenceConfidence: MIN_CONFIDENCE, minTrackingConfidence: MIN_CONFIDENCE,
     }))
     made.push(pose)
     const faceModel = await model(MODEL_FILES.face)
-    const face = await withGpuFallback((delegate) => FaceLandmarker.createFromOptions(fileset, {
+    const face = await withGpuFallback(restoreFactory, (delegate) => FaceLandmarker.createFromOptions(fileset, {
       baseOptions: { modelAssetBuffer: faceModel, delegate }, runningMode: 'VIDEO', numFaces: 2,
       outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true,
       minFaceDetectionConfidence: MIN_CONFIDENCE, minFacePresenceConfidence: MIN_CONFIDENCE, minTrackingConfidence: MIN_CONFIDENCE,
@@ -58,7 +76,7 @@ export async function createInference(o: InferenceOptions): Promise<Inference> {
     let hand: HandLandmarker | null = null
     if (o.enableHands) {
       const handModel = await model(MODEL_FILES.hand)
-      hand = await withGpuFallback((delegate) => HandLandmarker.createFromOptions(fileset, {
+      hand = await withGpuFallback(restoreFactory, (delegate) => HandLandmarker.createFromOptions(fileset, {
         baseOptions: { modelAssetBuffer: handModel, delegate }, runningMode: 'VIDEO', numHands: 2,
         minHandDetectionConfidence: MIN_CONFIDENCE, minHandPresenceConfidence: MIN_CONFIDENCE, minTrackingConfidence: MIN_CONFIDENCE,
       }))
