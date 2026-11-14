@@ -169,4 +169,85 @@ describe('AvatarCall', () => {
     await call.start();
     expect(session.attach).toHaveBeenCalledWith(video);
   });
+
+  it('closes a session whose start finishes after the call ended, and never unmutes it', async () => {
+    const gate = deferred<void>();
+    const { call, session } = setup();
+    session.start.mockImplementationOnce(() => gate.promise);
+    const started = call.start();
+    await flush();
+    await call.end('end');
+    expect(session.stop).toHaveBeenCalledTimes(1);
+    gate.resolve();
+    await started;
+    expect(session.stop).toHaveBeenCalledTimes(2);
+    expect(session.setMuted).not.toHaveBeenCalled();
+  });
+
+  it('closes a session that is still unmuting when the call ends', async () => {
+    const gate = deferred<void>();
+    const { call, session } = setup();
+    session.setMuted.mockImplementationOnce(() => gate.promise);
+    const started = call.start();
+    await flush();
+    await call.end('end');
+    expect(session.stop).toHaveBeenCalledTimes(1);
+    gate.resolve();
+    await started;
+    expect(session.stop).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not show a transcript view that arrives after the call ended', async () => {
+    const gate = deferred<IntakeView>();
+    const { call, events, callbacks } = setup({ transcript: vi.fn(() => gate.promise) });
+    await call.start();
+    callbacks().caption('user', 'hello there', 'e1');
+    await flush();
+    await call.end('end');
+    gate.resolve(view(3));
+    await flush();
+    expect(events.view).toHaveBeenLastCalledWith(view(9));
+    expect(events.view).not.toHaveBeenCalledWith(view(3));
+  });
+
+  it('logs a failed relay and keeps relaying', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { call, api, callbacks } = setup();
+      api.transcript.mockRejectedValueOnce(new Error('network'));
+      await call.start();
+      callbacks().caption('user', 'hello', 'e1');
+      callbacks().tool('c1', 'get_missing_fields', '{}');
+      await flush();
+      expect(warn).toHaveBeenCalledWith('avatar call: relay failed', expect.any(Error));
+      expect(api.tool).toHaveBeenCalledWith(1, 'c1', 'get_missing_fields', '{}');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('mute only reaches the session while the call is active', async () => {
+    const gate = deferred<void>();
+    const { call, session } = setup();
+    session.start.mockImplementationOnce(() => gate.promise);
+    const started = call.start();
+    await flush();
+    await call.mute(false);
+    expect(session.setMuted).not.toHaveBeenCalled();
+    gate.resolve();
+    await started;
+    await call.mute(true);
+    expect(session.setMuted).toHaveBeenLastCalledWith(true);
+  });
+
+  it('records the real reason when a session abandoned mid-connect is closed late', async () => {
+    const gate = deferred<{ intake: IntakeView; sessionToken: string; providerEpoch: number }>();
+    const { call, api } = setup({ connect: vi.fn(() => gate.promise) });
+    const started = call.start();
+    await call.end('end');
+    gate.resolve({ intake: view(2), sessionToken: 'late', providerEpoch: 1 });
+    await started;
+    expect(api.stop).toHaveBeenCalledTimes(2);
+    expect(api.stop).toHaveBeenNthCalledWith(2, 'end');
+  });
 });

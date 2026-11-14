@@ -52,6 +52,7 @@ export class AvatarCall {
   private epoch = 0;
   private queue: Promise<void> = Promise.resolve();
   private ending: Promise<void> | null = null;
+  private stopReason: AvatarStopReason = 'fallback';
 
   constructor(
     private readonly api: AvatarCallApi,
@@ -69,7 +70,7 @@ export class AvatarCall {
       const credentials = await this.api.connect();
       if (this.closed) {
         // Abandoned while the server was minting: close the session it just opened.
-        await this.api.stop('fallback').catch(() => undefined);
+        await this.api.stop(this.stopReason).catch(() => undefined);
         return;
       }
       this.epoch = credentials.providerEpoch;
@@ -82,9 +83,15 @@ export class AvatarCall {
       this.session = session;
       if (this.video) session.attach(this.video);
       await session.start();
-      if (this.closed) return;
+      if (this.closed) {
+        await session.stop().catch(() => undefined);
+        return;
+      }
       await session.setMuted(false);
-      if (this.closed) return;
+      if (this.closed) {
+        await session.stop().catch(() => undefined);
+        return;
+      }
       this.setState('active');
     } catch (err) {
       if (!this.closed) await this.fail(err instanceof ApiClientError ? err.message : 'Alex could not connect. Check your microphone; your answers are kept.');
@@ -99,6 +106,7 @@ export class AvatarCall {
   }
 
   async mute(muted: boolean): Promise<void> {
+    if (this.state !== 'active') return;
     await this.session?.setMuted(muted);
   }
 
@@ -106,6 +114,7 @@ export class AvatarCall {
   end(reason: AvatarStopReason): Promise<void> {
     if (this.ending) return this.ending;
     this.closed = true;
+    this.stopReason = reason;
     this.setState('ending');
     const session = this.session;
     this.session = null;
@@ -136,7 +145,9 @@ export class AvatarCall {
       .then(async () => {
         if (!this.closed) await task();
       })
-      .catch(() => undefined);
+      .catch((error: unknown) => {
+        console.warn('avatar call: relay failed', error);
+      });
   }
 
   private callbacks(): AvatarSessionCallbacks {
@@ -144,7 +155,10 @@ export class AvatarCall {
       caption: (role, text, itemId) => {
         const clean = text.trim().slice(0, 4_000);
         if (!clean || this.closed) return;
-        this.enqueue(async () => this.events.view(await this.api.transcript(this.epoch, itemId, role, clean)));
+        this.enqueue(async () => {
+          const next = await this.api.transcript(this.epoch, itemId, role, clean);
+          if (!this.closed) this.events.view(next);
+        });
       },
       tool: (callId, name, args) => {
         if (this.closed) return;
