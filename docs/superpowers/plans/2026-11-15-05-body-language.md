@@ -881,7 +881,7 @@ import { THRESHOLDS as T } from '@/onboarding/client/vision/thresholds'
 import { timeline, withFace } from './vision-fixtures'
 
 const ctx = { recordingId: 'rec', modelVersion: 'test' }
-const kinds = <T extends { kind: string }>(obs: T[], kind: string) => obs.filter((o) => o.kind === kind)
+const kinds = <O extends { kind: string }>(obs: O[], kind: string) => obs.filter((o) => o.kind === kind)
 
 describe('detectHead', () => {
   it('reports a head turn above 25° held for 2 s, in either direction', () => {
@@ -1143,7 +1143,7 @@ import type { LandmarkSample } from '@/onboarding/client/vision/types'
 import { pt, timeline, withHands, withPose } from './vision-fixtures'
 
 const ctx = { recordingId: 'rec', modelVersion: 'test' }
-const of = <T extends { kind: string }>(obs: T[], kind: string) => obs.filter((o) => o.kind === kind)
+const of = <O extends { kind: string }>(obs: O[], kind: string) => obs.filter((o) => o.kind === kind)
 const hand = (x: number, y: number, openPalm = false) => ({ center: { x, y }, openPalm })
 
 describe('detectHands', () => {
@@ -1302,7 +1302,7 @@ import { EVENT_KINDS, METRIC_KINDS } from '@/onboarding/client/vision/types'
 import { timeline, withBlend, withFace } from './vision-fixtures'
 
 const ctx = { recordingId: 'rec', modelVersion: 'test' }
-const of = <T extends { kind: string }>(obs: T[], kind: string) => obs.filter((o) => o.kind === kind)
+const of = <O extends { kind: string }>(obs: O[], kind: string) => obs.filter((o) => o.kind === kind)
 
 describe('detectFace', () => {
   it('reports brow raises ≥0.5 s and lip presses ≥1 s', () => {
