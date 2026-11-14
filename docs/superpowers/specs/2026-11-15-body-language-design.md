@@ -90,13 +90,13 @@ Files (under `src/onboarding/client/vision/` unless noted):
 
 - Lobby benchmark: 20 frames per tier. Choose Heavy if p95 per-frame < 40 ms, Full if < 60 ms, else Lite.
 - Hands run every second frame. Budget overrun backoff: 10 fps → 5 fps → hands off → visual analysis off with reason `device_too_slow`. The conversation is never affected.
-- React receives updates at most 1 Hz. Samples live in a bounded ring buffer (≤ 5 minutes); no raw landmarks are stored or uploaded.
+- React receives updates at most 1 Hz. Samples live in a bounded ring buffer (≤ 10 minutes, twice the 5-minute call limit, so a normal call is never trimmed); no raw landmarks are stored or uploaded.
 
 ## Events upload
 
 - `EventsBatch = { seq, consentVersion, observations: Observation[] }`, sent every 5 s or 20 observations, and once on stop.
 - Idempotency-Key = `${intakeId}:${consentVersion}:${instanceId}:${seq}` (instanceId is a random UUID per uploader, so a page reload never reuses a key with a different body); retries reuse it (backoff 1 s, 2 s, 4 s, then hold and send with the next flush). 5xx, 408, 429 and network errors retry; 409/410 stop the uploader; other 4xx drop that batch and continue.
-- On consent revoke: stop capture, drop queued batches, never send again for that `consentVersion`. A 409/410 from the server stops the uploader.
+- On consent revoke: stop capture, drop queued batches, never send again for that `consentVersion`. The session exposes this as `session.revoke()`: it disposes the source, calls `uploader.revoke()`, pushes and flushes nothing, and is one-way like `stop()` (whichever comes first wins). Aborting the signal means `stop()` (final observations are uploaded); consent withdrawal must call `revoke()`. A 409/410 from the server stops the uploader.
 - The schema is strict: a batch containing landmark arrays or image data fails validation before sending.
 - Until B ships the endpoint, `mockEventsHandler` (an injectable `fetch`) validates and records batches for tests and the demo.
 

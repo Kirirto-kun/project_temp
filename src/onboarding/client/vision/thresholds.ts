@@ -38,7 +38,8 @@ export const THRESHOLDS = {
   blinkMaxIntervalMs: 120,
   summaryMinValidMs: 10000,
   summaryMinCoverage: 0.7,
-  maxSamples: 3000,
+  /** 2x the 5-minute intake call limit, so a normal call is never trimmed. */
+  maxBufferMs: 600_000,
 }
 
 export type Thresholds = typeof THRESHOLDS

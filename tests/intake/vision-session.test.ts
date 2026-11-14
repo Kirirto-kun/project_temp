@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, type Mock } from 'vitest'
 import type { PoseTier } from '@/onboarding/client/vision/models'
 import { initialPacing, nextPacing } from '@/onboarding/client/vision/pacing'
+import { THRESHOLDS } from '@/onboarding/client/vision/thresholds'
 import { createVisionSession, type VisionUpdate } from '@/onboarding/client/vision/session'
 import type { LandmarkSource } from '@/onboarding/client/vision/source'
 import type { LandmarkSample, Observation } from '@/onboarding/client/vision/types'
@@ -69,6 +70,8 @@ function setup(
     signal?: AbortSignal
     grabGate?: Gate
     onUpdate?: (u: VisionUpdate) => void
+    thresholds?: typeof THRESHOLDS
+    uploader?: Record<string, unknown>
   } = {},
 ) {
   const { source, calls } = fakeSource(o)
@@ -76,7 +79,7 @@ function setup(
   const updates: VisionUpdate[] = []
   const frames: FakeFrame[] = []
   const grabs = { n: 0 }
-  const uploader = { push: vi.fn(), flush: vi.fn(async () => {}) }
+  const uploader = { push: vi.fn(), flush: vi.fn(async () => {}), revoke: vi.fn(), ...o.uploader }
   const session = createVisionSession({
     video: {} as HTMLVideoElement,
     clock: o.clock ?? (() => (now += 100)),
@@ -94,6 +97,7 @@ function setup(
       return frame as unknown as ImageBitmap
     },
     sleep: yieldTask,
+    thresholds: o.thresholds,
     onUpdate: (u) => {
       updates.push(u)
       o.onUpdate?.(u)
@@ -190,9 +194,7 @@ describe('createVisionSession', () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
       const { session, calls, updates } = setup({
-        onUpdate: (u) => {
-          if (u.status === 'running') throw new Error('consumer broke')
-        },
+        uploader: { push: vi.fn(() => { throw new Error('uploader broke') }) },
       })
       await session.start()
       await until(() => updates.some((u) => u.status === 'off'))
@@ -202,6 +204,32 @@ describe('createVisionSession', () => {
       expect(errSpy).toHaveBeenCalled()
       expect(unhandled).not.toHaveBeenCalled()
       await session.stop()
+    } finally {
+      process.off('unhandledRejection', unhandled)
+      errSpy.mockRestore()
+    }
+  })
+
+  it('never lets a throwing onUpdate escape, even while going off', async () => {
+    const unhandled = vi.fn()
+    process.on('unhandledRejection', unhandled)
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const seen: string[] = []
+      const { session, calls } = setup({
+        failInit: true,
+        onUpdate: (u) => {
+          seen.push(u.status)
+          throw new Error('consumer broke')
+        },
+      })
+      await session.start()
+      await until(() => seen.includes('off'))
+      for (let i = 0; i < 20; i++) await yieldTask()
+      expect(calls.disposed).toBe(true)
+      expect(errSpy).toHaveBeenCalled()
+      expect(unhandled).not.toHaveBeenCalled()
+      expect(await session.stop()).toMatchObject({ status: 'unavailable', unavailableReason: 'model_failed' })
     } finally {
       process.off('unhandledRejection', unhandled)
       errSpy.mockRestore()
@@ -314,5 +342,80 @@ describe('createVisionSession', () => {
         expect(x.endMs).toBeLessThan(latest - 3000)
       }
     }
+  })
+
+  it.each([[100, 'ten'], [200, 'five']])('trims the buffer by time, not count, at %i ms frame spacing (%s fps)', async (step) => {
+    let now = 0
+    const { session, calls } = setup({ clock: () => (now += step), thresholds: { ...THRESHOLDS, maxBufferMs: 5000 } })
+    await session.start()
+    await until(() => calls.frames > 150)
+    const samples = session.getSamples()
+    await session.stop()
+    const span = samples.at(-1)!.tMs - samples[0].tMs
+    expect(samples[0].tMs).toBeGreaterThanOrEqual(samples.at(-1)!.tMs - 5000)
+    expect(span).toBeGreaterThan(5000 - 2 * step)
+    expect(samples.length).toBeLessThanOrEqual(5000 / step + 1)
+    expect(samples.length).toBeGreaterThan(5000 / step - 3)
+  })
+
+  it('does not upload an event twice after the buffer slides over it', async () => {
+    const sampleAt = (t: number) => (t >= 1000 && t < 3500 ? withFace(baseSample(t), { yawDeg: 40 }) : baseSample(t))
+    const { session, calls, uploader } = setup({ sampleAt, thresholds: { ...THRESHOLDS, maxBufferMs: 8000 } })
+    await session.start()
+    await until(() => calls.frames >= 200)
+    await session.stop()
+    expect(session.getSamples()[0].tMs).toBeGreaterThan(3500) // the turn has slid out of the buffer
+    const turns = uploader.push.mock.calls.flat(2).filter((o: Observation) => o.kind === 'head_turn_away')
+    const distinct = new Set(turns.map((o: Observation) => o.id))
+    expect(distinct.size).toBe(1)
+    expect(turns.length).toBeGreaterThan(0)
+    // no pushed copy may be a truncated remnant starting at the trim point
+    for (const o of turns) expect(o.startMs).toBe(1000)
+  })
+
+  it('revoke while running never pushes or flushes, revokes the uploader and clears samples', async () => {
+    const { session, calls, updates, uploader } = setup()
+    await session.start()
+    await until(() => calls.frames >= 60)
+    const pushes = uploader.push.mock.calls.length
+    await session.revoke()
+    expect(uploader.push.mock.calls.length).toBe(pushes)
+    expect(uploader.flush).not.toHaveBeenCalled()
+    expect(uploader.revoke).toHaveBeenCalledTimes(1)
+    expect(calls.disposed).toBe(true)
+    expect(updates.at(-1)!.status).toBe('stopped')
+    expect(session.getSamples()).toHaveLength(0)
+    const frames = calls.frames
+    for (let i = 0; i < 20; i++) await yieldTask()
+    expect(calls.frames).toBe(frames)
+    expect(uploader.push.mock.calls.length).toBe(pushes)
+    const after = await session.stop()
+    expect(after.status).toBe('unavailable')
+    expect(uploader.flush).not.toHaveBeenCalled()
+    await session.revoke()
+    expect(uploader.revoke).toHaveBeenCalledTimes(1)
+  })
+
+  it('revoke works with an uploader that has no revoke, and loses to an earlier stop', async () => {
+    const a = setup({ uploader: { revoke: undefined } })
+    await a.session.start()
+    await until(() => a.calls.frames >= 20)
+    await a.session.revoke()
+    expect(a.updates.at(-1)!.status).toBe('stopped')
+    const b = setup()
+    await b.session.start()
+    await until(() => b.calls.frames >= 20)
+    await b.session.stop()
+    await b.session.revoke()
+    expect(b.uploader.revoke).not.toHaveBeenCalled()
+    expect(b.uploader.flush).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports why the session turned off in a non-ready summary', async () => {
+    const { session, updates } = setup({ inferenceMs: () => 200 })
+    await session.start()
+    await until(() => updates.some((u) => u.status === 'off'))
+    expect(session.getSamples().length).toBeGreaterThan(0)
+    expect(await session.stop()).toMatchObject({ unavailableReason: 'device_too_slow' })
   })
 })

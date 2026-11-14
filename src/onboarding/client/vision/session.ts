@@ -31,7 +31,8 @@ export type VisionSessionOptions = {
   enableHands: boolean
   signal?: AbortSignal
   source?: LandmarkSource
-  uploader?: Pick<EventsUploader, 'push' | 'flush'>
+  /** `revoke` is optional so a bare push/flush sink still works. */
+  uploader?: Pick<EventsUploader, 'push' | 'flush'> & Partial<Pick<EventsUploader, 'revoke'>>
   grabFrame?: (video: HTMLVideoElement) => Promise<ImageBitmap | null>
   sleep?: (ms: number) => Promise<void>
   onUpdate?: (u: VisionUpdate) => void
@@ -40,9 +41,15 @@ export type VisionSessionOptions = {
   thresholds?: Thresholds
 }
 
+/**
+ * Ending the session is one-way; whichever of stop()/revoke() comes first wins.
+ * Aborting `signal` means stop(): the final observations are uploaded.
+ * Withdrawing consent must call revoke(): nothing further is pushed or flushed.
+ */
 export type VisionSession = {
   start(): Promise<void>
   stop(): Promise<VisualSummary>
+  revoke(): Promise<void>
   getSamples(): LandmarkSample[]
   getObservations(): Observation[]
 }
@@ -76,13 +83,29 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
   let frameIndex = 0
   let lastUpdateT = 0
   let observations: Observation[] = []
+  let trimmed = false
 
   const detect = () => detectAll(samples, {
     recordingId: o.recordingId, modelVersion: modelVersion(tier ?? 'lite', t.version), handsEnabled: o.enableHands, thresholds: t,
   })
 
+  /** A throwing consumer must never break the session loop. */
   function emit(validMs = 0, observedMs = 0) {
-    o.onUpdate?.({ status, tier, pacing, observations, validMs, observedMs, offReason })
+    try {
+      o.onUpdate?.({ status, tier, pacing, observations, validMs, observedMs, offReason })
+    } catch (err) {
+      console.error('vision: onUpdate threw', err)
+    }
+  }
+
+  /**
+   * Once the buffer has slid, an event cut by the oldest sample gets a new startMs, hence a new id.
+   * Only events that start clear of the cut are stable enough to upload.
+   */
+  const uploadable = (obs: readonly Observation[]) => {
+    const head = samples[0]
+    if (!trimmed || !head) return [...obs]
+    return obs.filter((x) => x.unit !== 'ms' || x.startMs > head.tMs + t.maxSampleGapMs)
   }
 
   async function step(): Promise<number | null> {
@@ -100,7 +123,12 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
     const { sample, inferenceMs } = await src.process(frame, tMs, hands)
     if (!running) return null
     samples.push(sample)
-    if (samples.length > t.maxSamples) samples.shift()
+    let cut = 0
+    while (cut < samples.length - 1 && samples[cut]!.tMs < sample.tMs - t.maxBufferMs) cut++
+    if (cut > 0) {
+      samples.splice(0, cut)
+      trimmed = true
+    }
     o.onSample?.(sample)
     return inferenceMs
   }
@@ -171,7 +199,7 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
         lastUpdateT = lastT
         const { qualified, observations: next } = detect()
         observations = next
-        o.uploader?.push(observations.filter((x) => x.unit === 'ms' && x.endMs < lastT - FINALIZE_LAG_MS))
+        o.uploader?.push(uploadable(observations.filter((x) => x.unit === 'ms' && x.endMs < lastT - FINALIZE_LAG_MS)))
         const validMs = qualified.reduce((s, x) => s + (x.valid ? x.durMs : 0), 0)
         const observedMs = qualified.reduce((s, x) => s + x.durMs, 0)
         emit(validMs, observedMs)
@@ -209,17 +237,37 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
     observations = finalObs
     if (o.uploader) {
       try {
-        o.uploader.push(finalObs)
+        o.uploader.push(uploadable(finalObs))
         await o.uploader.flush()
       } catch (err) {
         console.error('vision: final upload failed', err)
       }
     }
     emit()
-    if (samples.length === 0) {
-      return { status: 'unavailable', validMs: 0, observedMs: 0, coverage: 0, unavailableReason: offReason ?? 'camera_off', events: [], metrics: [] }
+    if (samples.length === 0) return unavailable()
+    const summary = summarize(qualified, finalObs, t)
+    return offReason && summary.status !== 'ready' ? { ...summary, unavailableReason: offReason } : summary
+  }
+
+  const unavailable = (): VisualSummary =>
+    ({ status: 'unavailable', validMs: 0, observedMs: 0, coverage: 0, unavailableReason: offReason ?? 'camera_off', events: [], metrics: [] })
+
+  /** Consent withdrawn: dispose, tell the uploader to drop everything, push and flush nothing. */
+  async function doRevoke(): Promise<VisualSummary> {
+    running = false
+    o.signal?.removeEventListener('abort', onAbort)
+    source?.dispose()
+    source = null
+    status = 'stopped'
+    samples.length = 0
+    observations = []
+    try {
+      o.uploader?.revoke?.()
+    } catch (err) {
+      console.error('vision: uploader revoke failed', err)
     }
-    return summarize(qualified, finalObs, t)
+    emit()
+    return unavailable()
   }
 
   return {
@@ -237,6 +285,9 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
       void run()
     },
     stop,
+    async revoke() {
+      await (stopping ??= doRevoke())
+    },
     getSamples: () => [...samples],
     getObservations: () => [...observations],
   }
