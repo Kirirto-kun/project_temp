@@ -14,3 +14,6 @@ next-env.d.ts
 services/intake-agent/.venv/
 __pycache__/
 .vercel
+dist/
+public/intake/models/*.task
+public/intake/wasm/

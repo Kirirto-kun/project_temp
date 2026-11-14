@@ -5,7 +5,7 @@ const config = [
   ...nextVitals,
   ...nextTs,
   {
-    ignores: ['.next/**', 'node_modules/**', 'services/**', 'playwright-report/**', 'test-results/**', 'next-env.d.ts'],
+    ignores: ['.next/**', 'node_modules/**', 'services/**', 'playwright-report/**', 'test-results/**', 'next-env.d.ts', 'public/intake/wasm/**'],
   },
   {
     rules: {
