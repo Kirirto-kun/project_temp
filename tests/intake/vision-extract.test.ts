@@ -34,7 +34,7 @@ function frame(): RawFrame {
       ], headIndex: 0, headName: '' }],
     },
     handsFresh: true,
-    hands: { landmarks: [openRightHand().map((p) => lm(p.x, p.y))], handedness: [[{ categoryName: 'Left', score: 0.9, index: 0, displayName: '' }]] },
+    hands: { landmarks: [openRightHand().map((p) => lm(p.x, p.y))], handedness: [[{ categoryName: 'Right', score: 0.9, index: 0, displayName: '' }]] },
   }
 }
 
@@ -66,11 +66,11 @@ describe('toSample', () => {
 
 describe('isOpenPalm', () => {
   it('needs extended fingers and the palm facing the camera', () => {
-    expect(isOpenPalm(openRightHand(), 'Left')).toBe(true)
-    expect(isOpenPalm(openRightHand(), 'Right')).toBe(false)
+    expect(isOpenPalm(openRightHand(), 'Right')).toBe(true)
+    expect(isOpenPalm(openRightHand(), 'Left')).toBe(false)
     expect(isOpenPalm(openRightHand(), null)).toBe(false)
     const fist = openRightHand()
     for (const tip of [8, 12, 16, 20]) fist[tip] = { x: 0.5, y: 0.44 }
-    expect(isOpenPalm(fist, 'Left')).toBe(false)
+    expect(isOpenPalm(fist, 'Right')).toBe(false)
   })
 })

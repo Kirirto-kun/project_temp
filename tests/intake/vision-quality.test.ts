@@ -24,9 +24,14 @@ describe('qualify', () => {
     ['multiple_people', { faces: 2 }],
     ['multiple_people', { poses: 2 }],
   ] as const)('flags %s', (reason, patch) => {
-    const [x] = qualify([{ ...baseSample(0), ...patch }], T)
+    const [x] = qualify(timeline(0, 1000, 100, (s) => ({ ...s, ...patch })), T)
     expect(x!.valid).toBe(false)
     expect(x!.reason).toBe(reason)
+  })
+
+  it('ignores a second person seen for less than multiplePeopleMinMs (detector ghosts)', () => {
+    const q = qualify(timeline(0, 3000, 100, (s) => (s.tMs >= 1000 && s.tMs < 1300 ? { ...s, poses: 2 } : s)), T)
+    expect(q.every((x) => x.valid)).toBe(true)
   })
 
   it('treats a sudden jump of face and shoulders as a camera move and starts a new segment', () => {

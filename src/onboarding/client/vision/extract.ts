@@ -99,7 +99,8 @@ export function isOpenPalm(pts: readonly Vec[], label: string | null): boolean {
   const a = { x: p(5).x - wrist.x, y: p(5).y - wrist.y }
   const b = { x: p(17).x - wrist.x, y: p(17).y - wrist.y }
   const cross = a.x * b.y - a.y * b.x
-  // MediaPipe labels handedness as if the image were mirrored; we infer on the unmirrored frame, so the label is swapped.
-  const isRightHand = label === 'Left'
+  // Calibrated 2026-11-15 on the demo webcam (clip replay): on our unmirrored frames MediaPipe's label
+  // matches the person's own hand, despite the docs describing mirrored input.
+  const isRightHand = label === 'Right'
   return isRightHand ? cross < 0 : cross > 0
 }

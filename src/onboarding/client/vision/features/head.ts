@@ -4,20 +4,33 @@ import type { Qualified } from '../quality'
 import { sustainedRuns, whenValid, type Test } from '../runs'
 import type { Thresholds } from '../thresholds'
 import type { Observation } from '../types'
-import { bodyGeom, bodyReferences } from './body'
+import { bodyGeom, bodyReferences, neckClosure } from './body'
 
 export function detectHead(q: readonly Qualified[], t: Thresholds, ctx: Ctx): Observation[] {
   const refs = bodyReferences(q, t)
-  // Face models lose the face at steep pitch. With one body still in view, the nose dropping
-  // toward the shoulder line (vs the user's own reference) stands in for pitch.
-  const faceLostBody = (x: Qualified) => (x.reason === 'no_face' && x.s.poses === 1 ? bodyGeom(x.s, t) : null)
-  const turnedAway = whenValid((x) => (x.s.face ? Math.abs(x.s.face.yawDeg) > t.headTurnYawDeg : null))
-  const lookingDown: Test = (x) => {
-    if (x.valid) return x.s.face ? x.s.face.pitchDeg < t.headDownPitchDeg : null
-    const g = faceLostBody(x)
+  /** Body geometry and its reference where the frame shows one person, with or without a tracked face. */
+  const body = (x: Qualified) => {
+    if (!(x.valid || (x.reason === 'no_face' && x.s.poses === 1))) return null
+    const g = bodyGeom(x.s, t)
     const ref = refs.get(x.segment)
-    if (!g || g.neckD === null || !ref || ref.neckD === null) return null
-    return ref.neckD - g.neckD > t.headDownNeckDropWidths
+    return g && ref ? { g, ref } : null
+  }
+  const either = (a: boolean | null, b: boolean | null) => (a === true || b === true ? true : a === null && b === null ? null : false)
+
+  const turnedAway: Test = (x) => {
+    if (x.valid) return x.s.face ? Math.abs(x.s.face.yawDeg) > t.headTurnYawDeg : null
+    // Face models drop a face turned far away; the nose moving sideways over the shoulders stands in for yaw.
+    const b = body(x)
+    if (!b || b.g.noseX === null || b.ref.noseX === null) return null
+    return Math.abs(b.g.noseX - b.ref.noseX) > t.headTurnNoseOffsetWidths
+  }
+  // Face pitch saturates and jumps around at steep angles, so the nose dropping toward the shoulder
+  // line (and not the shoulders rising) counts as looking down whether or not the face is tracked.
+  const lookingDown: Test = (x) => {
+    const byFace = x.valid && x.s.face ? x.s.face.pitchDeg < t.headDownPitchDeg : null
+    const b = body(x)
+    const c = b ? neckClosure(b.g, b.ref, t) : null
+    return either(byFace, c === null ? null : c === 'head_drop')
   }
   // Out of frame means nobody is there; a lost face over a visible body is unknown, not absent.
   const outOfFrame: Test = (x) =>

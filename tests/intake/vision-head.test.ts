@@ -51,6 +51,34 @@ describe('detectHead', () => {
     expect(kinds(obs, 'out_of_frame')).toHaveLength(0)
   })
 
+  it('reports looking down from the nose drop even when face pitch stays shallow', () => {
+    // Face pitch is unreliable at steep angles (clip 2026-11-15: -23, -13, +3 while looking down).
+    const obs = detectHead(qualify(timeline(0, 15000, 100, (s) =>
+      s.tMs >= 7000 && s.tMs < 10000 ? withPose(withFace(s, { pitchDeg: -10 }), { nose: pt(0.5, 0.24) }) : s), T), T, ctx)
+    expect(kinds(obs, 'head_down')[0]).toMatchObject({ startMs: 7000, endMs: 10000 })
+  })
+
+  it('does not call raised shoulders looking down', () => {
+    const obs = detectHead(qualify(timeline(0, 15000, 100, (s) =>
+      s.tMs >= 7000 && s.tMs < 10000 ? withPose(s, { lShoulder: pt(0.62, 0.30), rShoulder: pt(0.38, 0.30) }) : s), T), T, ctx)
+    expect(kinds(obs, 'head_down')).toHaveLength(0)
+  })
+
+  it('reports a head turn from the nose offset when the face is lost', () => {
+    // Nose 0.06 right of the shoulder centre = 0.25 shoulder widths.
+    const obs = detectHead(qualify(timeline(0, 15000, 100, (s) =>
+      s.tMs >= 7000 && s.tMs < 10000 ? withPose({ ...s, faces: 0, face: null }, { nose: pt(0.56, 0.18) }) : s), T), T, ctx)
+    expect(kinds(obs, 'head_turn_away')[0]).toMatchObject({ startMs: 7000, endMs: 10000 })
+    expect(kinds(obs, 'out_of_frame')).toHaveLength(0)
+  })
+
+  it('keeps one event through a single-frame ghost second person', () => {
+    const obs = detectHead(qualify(timeline(0, 15000, 100, (s) =>
+      s.tMs === 8000 ? { ...withFace(s, { pitchDeg: -25 }), poses: 2 }
+      : s.tMs >= 7000 && s.tMs < 10000 ? withFace(s, { pitchDeg: -25 }) : s), T), T, ctx)
+    expect(kinds(obs, 'head_down')).toHaveLength(1)
+  })
+
   it('computes gaze share only with enough valid time', () => {
     const long = detectHead(qualify(timeline(0, 20000, 100, (s) =>
       s.tMs < 5000 ? withFace(s, { yawDeg: 40 }) : s), T), T, ctx)

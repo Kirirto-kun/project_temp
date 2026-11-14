@@ -43,6 +43,12 @@ describe('detectBody', () => {
     expect(obs.filter((o) => o.kind === 'shoulder_raise')).toHaveLength(1)
   })
 
+  it('does not call looking down a shoulder raise', () => {
+    const down = (s: LandmarkSample) => withPose(s, { nose: pt(0.5, 0.24) })
+    const obs = detectBody(qualify(timeline(0, 15000, 100, during(7000, 9000, down)), T), T, ctx)
+    expect(obs.filter((o) => o.kind === 'shoulder_raise')).toHaveLength(0)
+  })
+
   it('ignores shoulder raise while the nose is not visible', () => {
     const raiseHiddenNose = (s: LandmarkSample) =>
       withPose(s, { lShoulder: pt(0.62, 0.31), rShoulder: pt(0.38, 0.31), nose: pt(0.5, 0.18, 0.3) })

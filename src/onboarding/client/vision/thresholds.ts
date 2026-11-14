@@ -15,8 +15,14 @@ export const THRESHOLDS = {
   headTurnMinMs: 2000,
   headDownPitchDeg: -20,
   headDownMinMs: 2000,
-  /** Face lost but body visible: nose-to-shoulder distance below the reference by this many shoulder widths. */
+  /** Nose-to-shoulder-line distance below the reference by this many shoulder widths (face pitch fails at steep angles). */
   headDownNeckDropWidths: 0.15,
+  /** Face lost: nose this many shoulder widths sideways from its reference counts as turned away. */
+  headTurnNoseOffsetWidths: 0.2,
+  /** Share of a nose drop that must come from the shoulders rising to call it a shoulder raise, not a head drop. */
+  shoulderRiseShare: 0.5,
+  /** A second face/pose seen for less than this is a detector ghost, not another person. */
+  multiplePeopleMinMs: 500,
   gazeConeDeg: 20,
   gazeIrisYawGainDeg: 35,
   gazeIrisPitchGainDeg: 25,

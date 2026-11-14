@@ -6,8 +6,11 @@ import { avg } from '../stats'
 import type { Thresholds } from '../thresholds'
 import type { LandmarkSample, Observation } from '../types'
 
-/** neckD: vertical nose-to-shoulder-line distance in shoulder widths (scale-invariant). */
-export type BodyGeom = { center: Vec; width: number; neckD: number | null }
+/**
+ * neckD: vertical nose-to-shoulder-line distance in shoulder widths (scale-invariant).
+ * noseX: horizontal nose offset from the shoulder centre in shoulder widths.
+ */
+export type BodyGeom = { center: Vec; width: number; neckD: number | null; noseX: number | null }
 
 export function bodyGeom(s: LandmarkSample, t: Thresholds): BodyGeom | null {
   const p = s.pose
@@ -15,8 +18,12 @@ export function bodyGeom(s: LandmarkSample, t: Thresholds): BodyGeom | null {
   const width = dist(p.lShoulder, p.rShoulder)
   if (width < t.minShoulderWidth) return null
   const center = mid(p.lShoulder, p.rShoulder)
-  const neckD = p.nose.v < t.minConfidence ? null : (center.y - p.nose.y) / width
-  return { center, width, neckD }
+  const noseSeen = p.nose.v >= t.minConfidence
+  return {
+    center, width,
+    neckD: noseSeen ? (center.y - p.nose.y) / width : null,
+    noseX: noseSeen ? (p.nose.x - center.x) / width : null,
+  }
 }
 
 /** The user's own reference per framing segment: mean geometry over its first referenceMs. */
@@ -34,13 +41,28 @@ export function bodyReferences(q: readonly Qualified[], t: Thresholds): Map<numb
   for (const [segment, { items }] of acc) {
     if (items.length < t.referenceMinSamples) continue
     const necks = items.flatMap((g) => (g.neckD === null ? [] : [g.neckD]))
+    const noses = items.flatMap((g) => (g.noseX === null ? [] : [g.noseX]))
     refs.set(segment, {
       center: { x: avg(items.map((g) => g.center.x)), y: avg(items.map((g) => g.center.y)) },
       width: avg(items.map((g) => g.width)),
       neckD: necks.length ? avg(necks) : null,
+      noseX: noses.length ? avg(noses) : null,
     })
   }
   return refs
+}
+
+/**
+ * The nose closing in on the shoulder line is either the head dropping or the shoulders rising.
+ * Split by how much of it the shoulder line itself moved up. null when it cannot be judged.
+ */
+export function neckClosure(g: BodyGeom, ref: BodyGeom, t: Thresholds): 'head_drop' | 'shoulder_rise' | 'none' | null {
+  if (g.neckD === null || ref.neckD === null) return null
+  const drop = ref.neckD - g.neckD
+  if (drop <= Math.min(t.headDownNeckDropWidths, t.shoulderRaiseWidths)) return 'none'
+  const rise = (ref.center.y - g.center.y) / ref.width
+  if (rise >= drop * t.shoulderRiseShare) return drop > t.shoulderRaiseWidths ? 'shoulder_rise' : 'none'
+  return drop > t.headDownNeckDropWidths ? 'head_drop' : 'none'
 }
 
 export function detectBody(q: readonly Qualified[], t: Thresholds, ctx: Ctx): Observation[] {
@@ -61,8 +83,9 @@ export function detectBody(q: readonly Qualified[], t: Thresholds, ctx: Ctx): Ob
     ...sustainedRuns(q, whenValid((x) => {
       const ref = refs.get(x.segment)
       const g = bodyGeom(x.s, t)
-      if (!ref || !g || ref.neckD === null || g.neckD === null) return null
-      return ref.neckD - g.neckD > t.shoulderRaiseWidths
+      if (!ref || !g) return null
+      const c = neckClosure(g, ref, t)
+      return c === null ? null : c === 'shoulder_rise'
     }), t.shoulderRaiseMinMs)
       .map((run) => eventObservation(ctx, 'shoulder_raise', run)),
   ].sort((a, b) => a.startMs - b.startMs)
