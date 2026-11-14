@@ -12,7 +12,7 @@ npm run db:migrate
 npm run dev
 ```
 
-`setup:local` generates ignored local secrets only when `.env.local` is absent. `db:up` starts only the project's PostgreSQL container at 127.0.0.1:54329; other machine databases are untouched. The test database is `holdline_test`. `dev` supervises Next.js and the independent cleanup process. Production-default call flags are off. The quick form works without provider accounts; the illustrated poster is a preview, not a connected avatar.
+`setup:local` uses `.env.example`, generates ignored local secrets only when `.env.local` is absent, and appends missing template fields when it exists. It preserves existing values, comments and custom settings; rerun after updating the code to receive new blank provider fields. `db:up` starts only the project's PostgreSQL container at 127.0.0.1:54329; other machine databases are untouched. The test database is `holdline_test`. `dev` supervises Next.js and the independent cleanup process. Production-default call flags are off. The quick form works without provider accounts; the illustrated poster is a preview, not a connected avatar.
 
 ## Production deployment
 

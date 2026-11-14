@@ -9,7 +9,7 @@
 
 ## Account-dependent checks — pending
 
-No LiveAvatar or ElevenLabs accounts/keys were supplied during implementation. Therefore **no live avatar call, provider billing, latency, barge-in quality, actual managed-session expiry or provider retention/deletion has been accepted yet**. Follow [setup-ru.md](setup-ru.md).
+LiveAvatar account setup has begun; the full LiveAvatar/ElevenLabs connector is not configured yet. Therefore **no live avatar call, provider billing, latency, barge-in quality, actual managed-session expiry or provider retention/deletion has been accepted yet**. Follow [setup-ru.md](setup-ru.md).
 
 - [ ] Approved illustrated/stylized avatar ID and lip-sync from the selected voice.
 - [ ] Paid ElevenLabs key permissions, PCM 24K, exact model/voice/config IDs and client tools with wait-for-response.
