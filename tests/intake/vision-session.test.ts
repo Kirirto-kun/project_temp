@@ -2,6 +2,8 @@ import { describe, expect, it, vi, type Mock } from 'vitest'
 import type { PoseTier } from '@/onboarding/client/vision/models'
 import { initialPacing, nextPacing } from '@/onboarding/client/vision/pacing'
 import { THRESHOLDS } from '@/onboarding/client/vision/thresholds'
+import { createMockEventsServer } from '@/onboarding/client/vision/mock-events'
+import { createEventsUploader } from '@/onboarding/client/vision/upload'
 import { createVisionSession, type VisionUpdate } from '@/onboarding/client/vision/session'
 import type { LandmarkSource } from '@/onboarding/client/vision/source'
 import type { LandmarkSample, Observation } from '@/onboarding/client/vision/types'
@@ -70,6 +72,7 @@ function setup(
     signal?: AbortSignal
     grabGate?: Gate
     onUpdate?: (u: VisionUpdate) => void
+    onSample?: (s: LandmarkSample) => void
     thresholds?: typeof THRESHOLDS
     uploader?: Record<string, unknown>
   } = {},
@@ -98,6 +101,7 @@ function setup(
     },
     sleep: yieldTask,
     thresholds: o.thresholds,
+    onSample: o.onSample,
     onUpdate: (u) => {
       updates.push(u)
       o.onUpdate?.(u)
@@ -396,7 +400,7 @@ describe('createVisionSession', () => {
     expect(uploader.revoke).toHaveBeenCalledTimes(1)
   })
 
-  it('revoke works with an uploader that has no revoke, and loses to an earlier stop', async () => {
+  it('revoke works with an uploader that has no revoke, and still withdraws after an earlier stop', async () => {
     const a = setup({ uploader: { revoke: undefined } })
     await a.session.start()
     await until(() => a.calls.frames >= 20)
@@ -405,10 +409,80 @@ describe('createVisionSession', () => {
     const b = setup()
     await b.session.start()
     await until(() => b.calls.frames >= 20)
-    await b.session.stop()
+    const first = await b.session.stop()
+    expect(b.session.getSamples().length).toBeGreaterThan(0)
     await b.session.revoke()
-    expect(b.uploader.revoke).not.toHaveBeenCalled()
+    expect(b.uploader.revoke).toHaveBeenCalledTimes(1)
     expect(b.uploader.flush).toHaveBeenCalledTimes(1)
+    expect(b.session.getSamples()).toHaveLength(0)
+    expect(b.session.getObservations()).toHaveLength(0)
+    expect(await b.session.stop()).toBe(first) // first wins for the summary only
+  })
+
+  it('revoke during a pending final flush withdraws consent immediately', async () => {
+    const flushGate = gate()
+    const { session, calls, uploader } = setup({ uploader: { flush: vi.fn(() => flushGate.promise) } })
+    await session.start()
+    await until(() => calls.frames >= 30)
+    const stopping = session.stop()
+    await until(() => uploader.flush.mock.calls.length > 0)
+    const revoking = session.revoke()
+    expect(uploader.revoke).toHaveBeenCalledTimes(1) // synchronous, before the flush settles
+    expect(session.getSamples()).toHaveLength(0)
+    expect(session.getObservations()).toHaveLength(0)
+    flushGate.open()
+    await Promise.all([stopping, revoking])
+    expect(uploader.revoke).toHaveBeenCalledTimes(1)
+  })
+
+  it('delivers no batch after a revoke during a pending flush, even across the retry backoff', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+    try {
+      const server = createMockEventsServer({ failFirst: 1 })
+      const fetchGate = gate()
+      const real = createEventsUploader({
+        intakeId: 'i', consentVersion: 1, onError: () => {},
+        fetchImpl: async (input, init) => { await fetchGate.promise; return server.fetchImpl(input, init) },
+      })
+      const sampleAt = (t: number) => (t >= 1000 && t < 3500 ? withFace(baseSample(t), { yawDeg: 40 }) : baseSample(t))
+      const { session, calls } = setup({ sampleAt, uploader: { push: real.push, flush: real.flush, revoke: real.revoke } })
+      await session.start()
+      await until(() => calls.frames >= 100)
+      const stopping = session.stop()
+      for (let i = 0; i < 20; i++) await yieldTask() // let the final flush reach the gated fetch
+      const revoking = session.revoke()
+      fetchGate.open()
+      await Promise.all([stopping, revoking])
+      await vi.advanceTimersByTimeAsync(30000)
+      expect(server.batches).toHaveLength(0)
+      expect(server.calls.length).toBeLessThanOrEqual(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reports consent_withdrawn after a revoke', async () => {
+    const { session, calls, updates } = setup()
+    await session.start()
+    await until(() => calls.frames >= 20)
+    await session.revoke()
+    expect(updates.at(-1)).toMatchObject({ status: 'stopped', offReason: 'consent_withdrawn' })
+    expect(await session.stop()).toMatchObject({ status: 'unavailable', unavailableReason: 'consent_withdrawn' })
+  })
+
+  it('keeps running and collecting samples when onSample throws', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const { session, calls, updates } = setup({ onSample: () => { throw new Error('debug hook broke') } })
+      await session.start()
+      await until(() => calls.frames >= 40)
+      expect(session.getSamples().length).toBeGreaterThan(20)
+      expect(updates.some((u) => u.status === 'off')).toBe(false)
+      expect(errSpy).toHaveBeenCalled()
+      await session.stop()
+    } finally {
+      errSpy.mockRestore()
+    }
   })
 
   it('reports why the session turned off in a non-ready summary', async () => {

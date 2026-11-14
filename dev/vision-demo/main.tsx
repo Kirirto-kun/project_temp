@@ -27,6 +27,7 @@ function App() {
   const [moments, setMoments] = useState<Moment[]>([])
   const [batches, setBatches] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   function release(l: { stream: MediaStream }) {
     l.stream.getTracks().forEach((track) => track.stop())
@@ -58,6 +59,7 @@ function App() {
     setPhase('starting')
     setSummary(null)
     setError(null)
+    setNotice(null)
     setUpdate(null)
     setLast(null)
     setMoments([])
@@ -126,6 +128,28 @@ function App() {
     }
   }
 
+  async function withdrawConsent() {
+    const l = live.current
+    if (!l) return
+    live.current = null
+    release(l)
+    setPhase('idle')
+    setSummary(null)
+    setMoments([])
+    setUpdate(null)
+    setLast(null)
+    setHasClip(false)
+    lastSamples.current = null
+    setNotice('Visual analysis turned off; nothing more is sent.')
+    try {
+      await l.session.revoke()
+    } catch (err) {
+      console.error('revoke failed', err)
+    } finally {
+      l.uploader.dispose()
+    }
+  }
+
   const speaking = (down: boolean) => {
     const l = live.current
     if (!l) return
@@ -159,7 +183,7 @@ function App() {
       <p className="mt-1 text-sm text-muted">Frames are analysed in this browser. Only observations reach the mock endpoint; "Download clip" saves landmark timelines to your own disk for labelling.</p>
 
       <div className="mt-4 flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-2"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /> Analyse my camera on this device</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={consent} onChange={(e) => { setConsent(e.target.checked); if (!e.target.checked) void withdrawConsent() }} /> Analyse my camera on this device</label>
         <label className="flex items-center gap-2"><input type="checkbox" checked={hands} onChange={(e) => setHands(e.target.checked)} /> Hand tracking</label>
         <button className={`${btn} bg-hold text-on-hold disabled:opacity-50`} disabled={!consent || phase !== 'idle'} onClick={start}>Start</button>
         <button className={`${btn} border border-line bg-raised disabled:opacity-50`} disabled={phase !== 'live'} onClick={stop}>Stop</button>
@@ -167,6 +191,7 @@ function App() {
         <button className={`${btn} border border-line bg-raised disabled:opacity-50`} disabled={phase !== 'live' && !hasClip} onClick={download}>Download clip</button>
       </div>
       {error && <p className="mt-2 text-gap">{error}</p>}
+      {notice && <p className="mt-2 text-muted" role="status">{notice}</p>}
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <video ref={videoRef} muted playsInline className="w-full rounded-lg border border-line" style={{ transform: 'scaleX(-1)' }} />

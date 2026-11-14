@@ -49,6 +49,21 @@ describe('createEventsUploader', () => {
     up.dispose()
   })
 
+  it('drops only the invalid observations of a push and reports them once', async () => {
+    const server = createMockEventsServer()
+    const onError = vi.fn()
+    const up = createEventsUploader({ intakeId: 'i1', consentVersion: 1, fetchImpl: server.fetchImpl, onError })
+    const bad = { ...obs(2), id: '' } as ReturnType<typeof obs>
+    const bad2 = { ...obs(4), kind: 'nope' } as unknown as ReturnType<typeof obs>
+    up.push([obs(1), bad, obs(3), bad2])
+    expect(onError).toHaveBeenCalledOnce()
+    expect(onError.mock.calls[0]![0].message).toMatch(/2/)
+    await up.flush()
+    expect(server.batches).toHaveLength(1)
+    expect(server.batches[0]!.observations).toEqual([obs(1), obs(3)])
+    up.dispose()
+  })
+
   it('drops everything and stops sending on revoke', async () => {
     const server = createMockEventsServer()
     const up = createEventsUploader({ intakeId: 'i1', consentVersion: 1, fetchImpl: server.fetchImpl })

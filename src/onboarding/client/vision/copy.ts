@@ -18,6 +18,7 @@ export const REASON_TEXT: Record<UnavailableReason, string> = {
   device_too_slow: 'This device could not keep up, so visual analysis was turned off',
   camera_off: 'Camera was off',
   model_failed: 'Visual analysis could not start',
+  consent_withdrawn: 'Visual analysis was turned off at your request',
 }
 
 const METRIC_LABEL: Record<MetricKind, string> = {

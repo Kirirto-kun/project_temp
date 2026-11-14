@@ -1,4 +1,4 @@
-import { EventsBatchSchema, type EventsBatch, type Observation } from './types'
+import { EventsBatchSchema, ObservationSchema, type EventsBatch, type Observation } from './types'
 
 export type EventsUploaderOptions = {
   intakeId: string
@@ -40,11 +40,17 @@ export function createEventsUploader(o: EventsUploaderOptions): EventsUploader {
 
   function push(observations: readonly Observation[]) {
     if (closed) return
+    let invalid = 0
     for (const obs of observations) {
+      if (!ObservationSchema.safeParse(obs).success) {
+        invalid++
+        continue
+      }
       if (known.has(obs.id)) continue
       known.add(obs.id)
       queue.push(obs)
     }
+    if (invalid > 0) report(o.onError, new Error(`${invalid} invalid observation(s) dropped`))
     if (queue.length >= maxBatch && !retryTimer && failures === 0) void flush()
   }
 

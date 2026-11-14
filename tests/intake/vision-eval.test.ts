@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { scoreClips } from '@/onboarding/client/vision/eval'
+import { LabelledClipSchema, scoreClips } from '@/onboarding/client/vision/eval'
 import { timeline, withFace } from './vision-fixtures'
 
 describe('scoreClips', () => {
@@ -15,5 +15,11 @@ describe('scoreClips', () => {
     }], { handsEnabled: true })
     expect(scores.find((s) => s.kind === 'head_turn_away')).toMatchObject({ tp: 1, fp: 1, fn: 0, precision: 0.5, recall: 1 })
     expect(scores.find((s) => s.kind === 'head_down')).toMatchObject({ tp: 0, fp: 0, fn: 1, precision: null, recall: 0 })
+  })
+
+  it('parses clips saved before handsFresh existed, defaulting it to false', () => {
+    const { handsFresh: _omit, ...legacy } = timeline(0, 300, 100, (s) => s)[0]!
+    const clip = LabelledClipSchema.parse({ name: 'old', samples: [legacy], labels: [] })
+    expect(clip.samples[0]!.handsFresh).toBe(false)
   })
 })

@@ -42,7 +42,8 @@ export type VisionSessionOptions = {
 }
 
 /**
- * Ending the session is one-way; whichever of stop()/revoke() comes first wins.
+ * Ending the session is one-way; whichever of stop()/revoke() comes first decides the summary stop() returns.
+ * revoke() always withdraws consent, even after or during stop(): the uploader is revoked and buffers are cleared.
  * Aborting `signal` means stop(): the final observations are uploaded.
  * Withdrawing consent must call revoke(): nothing further is pushed or flushed.
  */
@@ -79,6 +80,7 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
   let running = false
   let started = false
   let stopping: Promise<VisualSummary> | null = null
+  let revoked = false
   let lastT = -1
   let frameIndex = 0
   let lastUpdateT = 0
@@ -129,7 +131,11 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
       samples.splice(0, cut)
       trimmed = true
     }
-    o.onSample?.(sample)
+    try {
+      o.onSample?.(sample)
+    } catch (err) {
+      console.error('vision: onSample threw', err)
+    }
     return inferenceMs
   }
 
@@ -243,6 +249,7 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
         console.error('vision: final upload failed', err)
       }
     }
+    if (revoked) return unavailable() // consent was withdrawn while the final flush was pending
     emit()
     if (samples.length === 0) return unavailable()
     const summary = summarize(qualified, finalObs, t)
@@ -252,13 +259,16 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
   const unavailable = (): VisualSummary =>
     ({ status: 'unavailable', validMs: 0, observedMs: 0, coverage: 0, unavailableReason: offReason ?? 'camera_off', events: [], metrics: [] })
 
-  /** Consent withdrawn: dispose, tell the uploader to drop everything, push and flush nothing. */
-  async function doRevoke(): Promise<VisualSummary> {
+  /** Consent withdrawn. Idempotent and synchronous, and it applies even after or during stop(). */
+  function withdraw() {
+    if (revoked) return
+    revoked = true
     running = false
     o.signal?.removeEventListener('abort', onAbort)
     source?.dispose()
     source = null
     status = 'stopped'
+    offReason = 'consent_withdrawn'
     samples.length = 0
     observations = []
     try {
@@ -267,7 +277,6 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
       console.error('vision: uploader revoke failed', err)
     }
     emit()
-    return unavailable()
   }
 
   return {
@@ -286,7 +295,10 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
     },
     stop,
     async revoke() {
-      await (stopping ??= doRevoke())
+      withdraw()
+      // First wins only decides which summary stop() returns.
+      stopping ??= Promise.resolve(unavailable())
+      await stopping
     },
     getSamples: () => [...samples],
     getObservations: () => [...observations],

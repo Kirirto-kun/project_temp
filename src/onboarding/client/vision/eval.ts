@@ -5,7 +5,11 @@ import { EVENT_KINDS, LandmarkSampleSchema, type EventKind } from './types'
 
 export const LabelledClipSchema = z.strictObject({
   name: z.string(),
-  samples: z.array(LandmarkSampleSchema),
+  // Clips saved before `handsFresh` existed lack it; the sample schema itself stays strict.
+  samples: z.preprocess(
+    (v) => (Array.isArray(v) ? v.map((s) => (s && typeof s === 'object' && !('handsFresh' in s) ? { ...s, handsFresh: false } : s)) : v),
+    z.array(LandmarkSampleSchema),
+  ),
   labels: z.array(z.strictObject({ kind: z.enum(EVENT_KINDS), startMs: z.number(), endMs: z.number() })),
 })
 export type LabelledClip = z.infer<typeof LabelledClipSchema>

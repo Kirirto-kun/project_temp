@@ -48,7 +48,7 @@ export const METRIC_KINDS = [
 ] as const
 export const UNAVAILABLE_REASONS = [
   'no_face', 'multiple_people', 'too_dark', 'camera_moved', 'limbs_not_visible', 'hands_disabled',
-  'not_enough_valid_time', 'frame_rate_too_low', 'device_too_slow', 'camera_off', 'model_failed',
+  'not_enough_valid_time', 'frame_rate_too_low', 'device_too_slow', 'camera_off', 'model_failed', 'consent_withdrawn',
 ] as const
 
 export const ObservationKindSchema = z.enum([...EVENT_KINDS, ...METRIC_KINDS])
