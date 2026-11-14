@@ -38,6 +38,14 @@ describe('qualify', () => {
     expect(q.at(-1)!.valid).toBe(true)
   })
 
+  it('still detects a camera move when frames arrive at 5 fps', () => {
+    // real 5 fps frames are never exactly 200 ms apart; use 210 ms
+    const samples = [...timeline(0, 1050, 210), ...timeline(1050, 3150, 210, (s) => shifted(s, 0.35, 0))]
+    const q = qualify(samples, T)
+    expect(q.filter((x) => x.reason === 'camera_moved')).toHaveLength(5)
+    expect(q.at(-1)!.segment).toBe(1)
+  })
+
   it('does not treat a slow shift as a camera move', () => {
     const q = qualify(timeline(0, 3000, 100, (s) => shifted(s, s.tMs * 0.0001, 0)), T)
     expect(q.every((x) => x.valid)).toBe(true)

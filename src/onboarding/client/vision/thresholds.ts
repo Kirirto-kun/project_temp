@@ -5,7 +5,8 @@ export const THRESHOLDS = {
   minLuma: 40,
   maxSampleGapMs: 300,
   cameraJumpFrac: 0.3,
-  cameraJumpWindowMs: 200,
+  /** Frames up to this far apart are compared; must exceed the 5 fps frame gap (200 ms). */
+  cameraJumpWindowMs: 350,
   cameraMovedInvalidMs: 1000,
   referenceMs: 5000,
   referenceMinSamples: 10,
