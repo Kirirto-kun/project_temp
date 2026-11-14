@@ -1,4 +1,5 @@
 import { ASSET_BASE, type PoseTier } from './models'
+import { retarget } from './retarget'
 import type { LandmarkSample } from './types'
 import { FromWorkerSchema, type HandsMode, type ToWorker } from './worker-protocol'
 
@@ -110,13 +111,20 @@ export function createMainThreadSource(assetBase = ASSET_BASE): LandmarkSource {
       initializing = true
       try {
         const { createInference } = await import('./inference')
-        const created = await createInference({ ...o, assetBase })
+        const current = inference
+        inference = null // no frames against a half-switched model
+        let next: Awaited<ReturnType<typeof retarget>>
+        try {
+          next = await retarget(current, { ...o, assetBase }, createInference)
+        } catch (err) {
+          current?.close() // a failed swap must not leave the old models unreachable (close is idempotent)
+          throw err
+        }
         if (disposed) {
-          created.close()
+          next.close()
           throw new Error('vision source disposed')
         }
-        inference?.close()
-        inference = created
+        inference = next
       } finally {
         initializing = false
       }

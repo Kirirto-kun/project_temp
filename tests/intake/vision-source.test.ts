@@ -142,7 +142,19 @@ describe('worker source', () => {
 })
 
 describe('main-thread source', () => {
-  const fakeInference = () => ({ run: vi.fn(() => baseSample(1)), close: vi.fn() })
+  const fakeInference = (o: { tier: string; enableHands: boolean } = { tier: 'lite', enableHands: false }) =>
+    ({ options: { ...o, assetBase: '/intake' }, run: vi.fn(() => baseSample(1)), setTier: vi.fn(async () => {}), close: vi.fn() })
+
+  it('switching only the tier swaps the pose model in place instead of reloading everything', async () => {
+    const inf = fakeInference({ tier: 'heavy', enableHands: true })
+    inferenceMock.createInference.mockResolvedValue(inf)
+    const src = createMainThreadSource('/intake')
+    await src.init({ tier: 'heavy', enableHands: true })
+    await src.init({ tier: 'full', enableHands: true })
+    expect(inferenceMock.createInference).toHaveBeenCalledOnce()
+    expect(inf.setTier).toHaveBeenCalledWith('full')
+    expect(inf.close).not.toHaveBeenCalled()
+  })
 
   it('dispose during init closes the late inference and rejects init', async () => {
     let resolve!: (v: unknown) => void

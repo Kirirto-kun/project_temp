@@ -6,7 +6,14 @@ import type { HandsMode } from './worker-protocol'
 
 export type InferenceOptions = { tier: PoseTier; enableHands: boolean; assetBase: string }
 /** Callers must pass strictly increasing `tMs` (MediaPipe VIDEO mode requirement); the session enforces it. */
-export type Inference = { run(frame: ImageBitmap, tMs: number, hands: HandsMode): LandmarkSample; close(): void }
+export type Inference = {
+  readonly options: Readonly<InferenceOptions>
+  run(frame: ImageBitmap, tMs: number, hands: HandsMode): LandmarkSample
+  /** Swap only the pose model; face and hand landmarkers stay loaded. */
+  setTier(tier: PoseTier): Promise<void>
+  close(): void
+}
+
 
 const MIN_CONFIDENCE = 0.7
 const HAND_REUSE_MS = 250
@@ -60,11 +67,14 @@ export async function createInference(o: InferenceOptions): Promise<Inference> {
   // Close any landmarker already created if a later step throws, so a failed init leaks no WASM heap.
   const made: { close(): void }[] = []
   try {
-    const poseModel = await model(MODEL_FILES.pose[o.tier])
-    const pose = await withGpuFallback(restoreFactory, (delegate) => PoseLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetBuffer: poseModel, delegate }, runningMode: 'VIDEO', numPoses: 2,
-      minPoseDetectionConfidence: MIN_CONFIDENCE, minPosePresenceConfidence: MIN_CONFIDENCE, minTrackingConfidence: MIN_CONFIDENCE,
-    }))
+    const createPose = async (tier: PoseTier) => {
+      const poseModel = await model(MODEL_FILES.pose[tier])
+      return withGpuFallback(restoreFactory, (delegate) => PoseLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetBuffer: poseModel, delegate }, runningMode: 'VIDEO', numPoses: 2,
+        minPoseDetectionConfidence: MIN_CONFIDENCE, minPosePresenceConfidence: MIN_CONFIDENCE, minTrackingConfidence: MIN_CONFIDENCE,
+      }))
+    }
+    let pose = await createPose(o.tier)
     made.push(pose)
     const faceModel = await model(MODEL_FILES.face)
     const face = await withGpuFallback(restoreFactory, (delegate) => FaceLandmarker.createFromOptions(fileset, {
@@ -96,7 +106,21 @@ export async function createInference(o: InferenceOptions): Promise<Inference> {
 
     let lastHands: { tMs: number; result: HandLandmarkerResult } | null = null
 
+    const options = { ...o }
+    let closed = false
     return {
+      options,
+      async setTier(tier) {
+        if (closed) throw new Error('vision inference closed')
+        const next = await createPose(tier)
+        if (closed) {
+          next.close()
+          throw new Error('vision inference closed')
+        }
+        pose.close()
+        pose = next
+        options.tier = tier
+      },
       run(frame, tMs, handsMode) {
         const poseRes = pose.detectForVideo(frame, tMs)
         try {
@@ -116,6 +140,8 @@ export async function createInference(o: InferenceOptions): Promise<Inference> {
         }
       },
       close() {
+        if (closed) return
+        closed = true
         pose.close()
         face.close()
         hand?.close()

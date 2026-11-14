@@ -64,6 +64,26 @@ describe('toSample', () => {
   })
 })
 
+describe('counting people', () => {
+  const shift = (lms: { x: number; y: number; visibility?: number }[], dx: number) => lms.map((l) => lm(l.x + dx, l.y, l.visibility ?? 1))
+
+  it('does not count an overlapping second face or pose as another person (same head detected twice)', () => {
+    const f = frame()
+    const ghostFace = shift(f.face.faceLandmarks[0]!, 0.02)
+    const ghostPose = shift(f.pose.landmarks[0]!, 0.03)
+    const s = toSample({ ...f, face: { ...f.face, faceLandmarks: [f.face.faceLandmarks[0]!, ghostFace] }, pose: { landmarks: [f.pose.landmarks[0]!, ghostPose] } })
+    expect(s).toMatchObject({ faces: 1, poses: 1 })
+  })
+
+  it('counts a separate second face and pose', () => {
+    const f = frame()
+    const otherFace = shift(f.face.faceLandmarks[0]!, 0.3)
+    const otherPose = shift(f.pose.landmarks[0]!, 0.3)
+    const s = toSample({ ...f, face: { ...f.face, faceLandmarks: [f.face.faceLandmarks[0]!, otherFace] }, pose: { landmarks: [f.pose.landmarks[0]!, otherPose] } })
+    expect(s).toMatchObject({ faces: 2, poses: 2 })
+  })
+})
+
 describe('isOpenPalm', () => {
   it('needs extended fingers and the palm facing the camera', () => {
     expect(isOpenPalm(openRightHand(), 'Right')).toBe(true)

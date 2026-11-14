@@ -1,4 +1,5 @@
 import { createInference, type Inference } from './inference'
+import { retarget } from './retarget'
 import type { FromWorker, ToWorker } from './worker-protocol'
 
 type Scope = { postMessage(message: FromWorker): void; onmessage: ((e: MessageEvent<ToWorker>) => void) | null }
@@ -13,9 +14,14 @@ async function handle(m: ToWorker) {
   switch (m.type) {
     case 'init':
       try {
-        inference?.close()
-        inference = null
-        inference = await createInference(m)
+        const current = inference
+        inference = null // no frames against a half-switched model
+        try {
+          inference = await retarget(current, m, createInference)
+        } catch (err) {
+          current?.close() // a failed swap must not leave the old models unreachable (close is idempotent)
+          throw err
+        }
         scope.postMessage({ type: 'ready' })
       } catch (err) {
         scope.postMessage({ type: 'error', id: null, message: message(err) })

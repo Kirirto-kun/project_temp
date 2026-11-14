@@ -43,7 +43,7 @@ Every Observation is a fact with a value and unit. The report never adds a meani
 
 ## Quality gates
 
-Per sample, `quality.ts` returns `valid` or one reason: `no_face`, `multiple_people`, `low_confidence` (< 0.7), `too_dark` (mean luma < 40/255), `camera_moved` (background-free proxy: simultaneous jump of all keypoints > 0.3 frame width), `limbs_not_visible` (only gates the kinds that need them).
+Extraction collapses duplicate detections (face boxes with IoU > 0.3, poses whose shoulder centres are within half a shoulder width) before counting people; `multiple_people` must also last ≥ 500 ms. Per sample, `quality.ts` returns `valid` or one reason: `no_face`, `multiple_people`, `low_confidence` (< 0.7), `too_dark` (mean luma < 40/255), `camera_moved` (background-free proxy: simultaneous jump of all keypoints > 0.3 frame width), `limbs_not_visible` (only gates the kinds that need them).
 
 - Each window/aggregate carries `validMs`, `observedMs` and the dominant unavailable reason.
 - A kind is evaluated only where its required points are visible. An unseen hand is "unknown", not "no gestures".
@@ -88,7 +88,7 @@ Files (under `src/onboarding/client/vision/` unless noted):
 
 ## Performance
 
-- Lobby benchmark: 20 frames per tier after 5 discarded warm-up frames (shader compile). Choose Heavy if p95 per-frame < 40 ms, Full if < 60 ms, else Lite.
+- Lobby benchmark: 20 frames per tier after 5 discarded warm-up frames (shader compile). Choose Heavy if p95 per-frame < 40 ms, Full if < 60 ms, else Lite. Switching tier swaps only the pose model; face and hand landmarkers stay loaded.
 - Hands run every second frame. Budget overrun backoff: 10 fps → 5 fps → hands off → visual analysis off with reason `device_too_slow`. The conversation is never affected.
 - React receives updates at most 1 Hz. Samples live in a bounded ring buffer (≤ 10 minutes, twice the 5-minute call limit, so a normal call is never trimmed); no raw landmarks are stored or uploaded.
 
