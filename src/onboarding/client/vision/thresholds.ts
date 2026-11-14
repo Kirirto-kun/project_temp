@@ -15,6 +15,8 @@ export const THRESHOLDS = {
   headTurnMinMs: 2000,
   headDownPitchDeg: -20,
   headDownMinMs: 2000,
+  /** Face lost but body visible: nose-to-shoulder distance below the reference by this many shoulder widths. */
+  headDownNeckDropWidths: 0.15,
   gazeConeDeg: 20,
   gazeIrisYawGainDeg: 35,
   gazeIrisPitchGainDeg: 25,
