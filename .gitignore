@@ -1,0 +1,4 @@
+node_modules/
+dist/
+public/intake/models/*.task
+public/intake/wasm/
