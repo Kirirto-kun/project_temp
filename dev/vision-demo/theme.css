@@ -1,0 +1,29 @@
+@import "tailwindcss";
+@source "../../src";
+@source "./";
+
+:root {
+  --paper: #f4f6f8; --raised: #ffffff; --line: #dce1e7; --ink: #101820; --muted: #5a6674;
+  --hold: #1b4dff; --on-hold: #ffffff; --hold-tint: #e4ebff; --won: #0e7a3e; --gap: #b45309;
+  --font-display-stack: "Inter Tight", Inter, "Helvetica Neue", Arial, sans-serif;
+  --font-sans-stack: Inter, "Helvetica Neue", Arial, sans-serif;
+  --font-mono-stack: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0c1218; --raised: #151d26; --line: #26303b; --ink: #eef1f5; --muted: #9aa6b4;
+    --hold: #6c8bff; --on-hold: #0c1218; --hold-tint: #1a2646; --won: #3dd68c; --gap: #ffb454;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper); --color-raised: var(--raised); --color-line: var(--line);
+  --color-ink: var(--ink); --color-muted: var(--muted); --color-hold: var(--hold);
+  --color-on-hold: var(--on-hold); --color-hold-tint: var(--hold-tint); --color-won: var(--won); --color-gap: var(--gap);
+  --font-display: var(--font-display-stack); --font-sans: var(--font-sans-stack); --font-mono: var(--font-mono-stack);
+}
+
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-sans-stack); }
+:focus-visible { outline: 2px solid var(--hold); outline-offset: 2px; }
