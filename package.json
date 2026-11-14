@@ -1,0 +1,54 @@
+{
+  "name": "holdline",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Holdline: rehearse a money conversation before it costs you.",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:engine": "vitest run --project engine",
+    "test:server": "vitest run --project server",
+    "test:ui": "vitest run --project ui",
+    "test:intake": "vitest run --project intake",
+    "test:e2e": "playwright test",
+    "test:classifier:live": "tsx scripts/evaluate-classifier.ts"
+  },
+  "dependencies": {
+    "@elevenlabs/client": "1.36.1",
+    "@elevenlabs/react": "1.22.1",
+    "clsx": "2.1.1",
+    "lucide-react": "1.73.0",
+    "next": "16.4.6",
+    "pitchfinder": "2.3.4",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@tailwindcss/postcss": "4.3.5",
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/jest-dom": "6.10.0",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.10",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "5.2.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.6",
+    "jsdom": "27.4.0",
+    "tailwindcss": "4.3.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "7.3.8",
+    "vitest": "4.1.12"
+  }
+}
