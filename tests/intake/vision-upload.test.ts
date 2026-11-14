@@ -231,4 +231,41 @@ describe('createEventsUploader', () => {
     up.dispose()
     spy.mockRestore()
   })
+
+  it('retries 429 like a 5xx with the same key', async () => {
+    const server = createMockEventsServer({ failFirst: 1, failStatus: 429 })
+    const up = createEventsUploader({ intakeId: 'i1', consentVersion: 1, fetchImpl: server.fetchImpl })
+    up.push([obs(1)])
+    await up.flush()
+    expect(server.batches).toHaveLength(0)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(server.batches).toHaveLength(1)
+    expect(server.calls).toHaveLength(2)
+    expect(server.calls[1]!.key).toBe(server.calls[0]!.key)
+    up.dispose()
+  })
+
+  it('flush sends data pushed after the in-flight drain saw an empty queue', async () => {
+    const resolvers: Array<(r: Response) => void> = []
+    const bodies: string[] = []
+    const fetchImpl = ((_u: unknown, init: RequestInit) => {
+      bodies.push(String(init.body))
+      return new Promise<Response>((resolve) => resolvers.push(resolve))
+    }) as unknown as typeof fetch
+    const up = createEventsUploader({ intakeId: 'i1', consentVersion: 1, fetchImpl })
+    up.push([obs(1)])
+    const first = up.flush()
+    resolvers[0]!(new Response(null, { status: 200 }))
+    await Promise.resolve()
+    await Promise.resolve()
+    up.push([obs(2)])
+    const second = up.flush()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(bodies).toHaveLength(2)
+    resolvers[1]!(new Response(null, { status: 200 }))
+    await Promise.all([first, second])
+    expect(bodies).toHaveLength(2)
+    expect(bodies[1]).toContain(obs(2).id)
+    up.dispose()
+  })
 })

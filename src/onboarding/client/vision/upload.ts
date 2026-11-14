@@ -34,6 +34,7 @@ export function createEventsUploader(o: EventsUploaderOptions): EventsUploader {
   let failures = 0
   let closed = false
   let inFlight: Promise<void> | null = null
+  let followUp: Promise<void> | null = null
   let retryTimer: ReturnType<typeof setTimeout> | null = null
   const interval = setInterval(() => { if (!retryTimer) void flush() }, o.intervalMs ?? 5000)
 
@@ -49,7 +50,12 @@ export function createEventsUploader(o: EventsUploaderOptions): EventsUploader {
 
   function flush(): Promise<void> {
     if (closed) return Promise.resolve()
-    inFlight ??= drain().catch((err) => report(o.onError, toError(err))).finally(() => { inFlight = null })
+    if (inFlight) {
+      // The running drain may already have seen an empty queue, so chain one more pass.
+      followUp ??= inFlight.then(() => { followUp = null; return flush() })
+      return followUp
+    }
+    inFlight = drain().catch((err) => report(o.onError, toError(err))).finally(() => { inFlight = null })
     return inFlight
   }
 
@@ -87,7 +93,7 @@ export function createEventsUploader(o: EventsUploaderOptions): EventsUploader {
         report(o.onFatal, res.status)
         return
       }
-      if (res.status >= 400 && res.status < 500) {
+      if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
         pending = null
         failures = 0
         report(o.onError, new Error(`events batch ${batch.seq} dropped: HTTP ${res.status}`))
