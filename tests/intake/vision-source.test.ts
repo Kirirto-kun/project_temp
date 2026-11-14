@@ -66,13 +66,55 @@ describe('worker source', () => {
     }
   })
 
-  it('a second init rejects the earlier waiter', async () => {
+  it('a second concurrent init rejects immediately and leaves the first waiter alone', async () => {
     const s = createWorkerSource('/a')
     const first = s.init(initOpts)
-    const second = s.init(initOpts)
-    await expect(first).rejects.toThrow()
+    await expect(s.init(initOpts)).rejects.toThrow('vision source init already in progress')
     FakeWorker.last.emit({ type: 'ready' })
-    await expect(second).resolves.toBeUndefined()
+    await expect(first).resolves.toBeUndefined()
+  })
+
+  it('after onerror: later process rejects immediately, closes the frame, and the worker was terminated', async () => {
+    const s = createWorkerSource('/a')
+    const w = FakeWorker.last
+    w.onerror?.({ message: 'crash' })
+    expect(w.terminate).toHaveBeenCalledOnce()
+    const f = bitmap()
+    await expect(s.process(f, 1, 'run')).rejects.toThrow('crash')
+    expect(f.close).toHaveBeenCalledOnce()
+    await expect(s.init(initOpts)).rejects.toThrow('crash')
+    expect(w.posted).toEqual([])
+  })
+
+  it('init timeout rejects, terminates and latches dead', async () => {
+    vi.useFakeTimers()
+    try {
+      const s = createWorkerSource('/a', { initTimeoutMs: 50 })
+      const w = FakeWorker.last
+      const p = s.init(initOpts)
+      const assertion = expect(p).rejects.toThrow('vision worker did not start within 30 s')
+      await vi.advanceTimersByTimeAsync(50)
+      await assertion
+      expect(w.terminate).toHaveBeenCalledOnce()
+      await expect(s.init(initOpts)).rejects.toThrow('did not start')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('ready clears the init timer', async () => {
+    vi.useFakeTimers()
+    try {
+      const s = createWorkerSource('/a', { initTimeoutMs: 50 })
+      const w = FakeWorker.last
+      const p = s.init(initOpts)
+      w.emit({ type: 'ready' })
+      await expect(p).resolves.toBeUndefined()
+      await vi.advanceTimersByTimeAsync(100)
+      expect(w.terminate).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('after dispose: process closes the frame and rejects, init rejects, worker terminated', async () => {
@@ -113,6 +155,25 @@ describe('main-thread source', () => {
     resolve(inf)
     await expect(p).rejects.toThrow('disposed')
     expect(inf.close).toHaveBeenCalledOnce()
+  })
+
+  it('a second concurrent init rejects and the first still resolves', async () => {
+    let resolve!: (v: unknown) => void
+    inferenceMock.createInference.mockReturnValue(new Promise((r) => { resolve = r }))
+    const s = createMainThreadSource('/a')
+    const first = s.init(initOpts)
+    await expect(s.init(initOpts)).rejects.toThrow('vision source init already in progress')
+    await vi.waitFor(() => expect(inferenceMock.createInference).toHaveBeenCalled())
+    resolve(fakeInference())
+    await expect(first).resolves.toBeUndefined()
+  })
+
+  it('a failed init rejects and a later init can succeed', async () => {
+    inferenceMock.createInference.mockRejectedValueOnce(new Error('load failed'))
+    const s = createMainThreadSource('/a')
+    await expect(s.init(initOpts)).rejects.toThrow('load failed')
+    inferenceMock.createInference.mockResolvedValue(fakeInference())
+    await expect(s.init(initOpts)).resolves.toBeUndefined()
   })
 
   it('process closes the frame on success and on error', async () => {

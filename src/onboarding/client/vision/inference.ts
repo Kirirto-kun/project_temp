@@ -81,15 +81,15 @@ export async function createInference(o: InferenceOptions): Promise<Inference> {
     return {
       run(frame, tMs, handsMode) {
         const poseRes = pose.detectForVideo(frame, tMs)
-        const faceRes = face.detectForVideo(frame, tMs)
-        let handsRes: HandLandmarkerResult | null = null
-        if (hand && handsMode !== 'off') {
-          if (handsMode === 'run' || !lastHands || tMs - lastHands.tMs > HAND_REUSE_MS) {
-            lastHands = { tMs, result: hand.detectForVideo(frame, tMs) }
-          }
-          handsRes = lastHands.result
-        }
         try {
+          const faceRes = face.detectForVideo(frame, tMs)
+          let handsRes: HandLandmarkerResult | null = null
+          if (hand && handsMode !== 'off') {
+            if (handsMode === 'run' || !lastHands || tMs - lastHands.tMs > HAND_REUSE_MS) {
+              lastHands = { tMs, result: hand.detectForVideo(frame, tMs) }
+            }
+            handsRes = lastHands.result
+          }
           return toSample({ tMs, frameW: frame.width, frameH: frame.height, luma: luma(frame), pose: poseRes, face: faceRes, hands: handsRes })
         } finally {
           poseRes.close()
@@ -102,7 +102,9 @@ export async function createInference(o: InferenceOptions): Promise<Inference> {
       },
     }
   } catch (err) {
-    for (const m of made) m.close()
+    for (const m of made) {
+      try { m.close() } catch { /* keep closing the rest; the original error matters more */ }
+    }
     throw err
   }
 }

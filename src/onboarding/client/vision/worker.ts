@@ -14,6 +14,7 @@ async function handle(m: ToWorker) {
     case 'init':
       try {
         inference?.close()
+        inference = null
         inference = await createInference(m)
         scope.postMessage({ type: 'ready' })
       } catch (err) {
