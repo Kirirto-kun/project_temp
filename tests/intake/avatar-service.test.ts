@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { COST_ESTIMATES } from '@/server/limits/budget';
 import type { LiveAvatarClient } from '@/onboarding/server/liveavatar';
-import { connectVideo, createIntake, intakeStore, stopMedia } from '@/onboarding/server/service';
+import { connectVideo, createIntake, deleteIntake, intakeStore, stopMedia } from '@/onboarding/server/service';
 import { ALL_ON, IP, OWNER, makeDeps } from '../server/helpers';
 
 function fakeLiveAvatar(): LiveAvatarClient & { mintToken: ReturnType<typeof vi.fn>; stopSession: ReturnType<typeof vi.fn> } {
@@ -49,6 +49,38 @@ describe('video call', () => {
     await expect(connectVideo(deps, OWNER, IP, v.id, v.revision)).rejects.toMatchObject({ code: 'UPSTREAM_UNAVAILABLE' });
     expect(await deps.budget.spentToday()).toBe(0);
     expect((await intakeStore(deps).read(v.id))?.providerEpoch).toBe(0);
+    // The quota unit is refunded: the IP can still make the full daily number of attempts.
+    for (let i = 0; i < 3; i += 1) await expect(deps.quota.consume('intake', IP, OWNER)).resolves.toBeUndefined();
+    await expect(deps.quota.consume('intake', IP, OWNER)).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+  });
+
+  it('a failed store write after minting releases the attempt and stops the new provider session', async () => {
+    const liveAvatar = fakeLiveAvatar();
+    const { deps, v } = await videoIntake(liveAvatar);
+    liveAvatar.mintToken.mockImplementationOnce(async () => {
+      await deps.kv.del(`int:${v.id}`);
+      return { sessionId: 'sess-minted', sessionToken: 'token-minted' };
+    });
+    await expect(connectVideo(deps, OWNER, IP, v.id, v.revision)).rejects.toMatchObject({ code: 'EXPIRED' });
+    expect(await deps.budget.spentToday()).toBe(0);
+    expect(liveAvatar.stopSession).toHaveBeenCalledWith('sess-minted');
+  });
+
+  it('deleting the intake during a video call stops the provider session', async () => {
+    const { deps, liveAvatar, v } = await videoIntake();
+    await connectVideo(deps, OWNER, IP, v.id, v.revision);
+    await deleteIntake(deps, OWNER, v.id);
+    expect(liveAvatar.stopSession).toHaveBeenCalledWith('sess-1');
+    expect(await intakeStore(deps).read(v.id)).toBeNull();
+  });
+
+  it('a mint failure while resuming keeps the existing hold', async () => {
+    const { deps, liveAvatar, v } = await videoIntake();
+    const first = await connectVideo(deps, OWNER, IP, v.id, v.revision);
+    deps.clock.now += 60_000;
+    liveAvatar.mintToken.mockRejectedValueOnce(new Error('500'));
+    await expect(connectVideo(deps, OWNER, IP, v.id, first.intake.revision)).rejects.toMatchObject({ code: 'UPSTREAM_UNAVAILABLE' });
+    expect(await deps.budget.spentToday()).toBe(5 * COST_ESTIMATES.avatarPerMinute);
   });
 
   it('stop closes the provider session and settles the hold at the avatar rate', async () => {

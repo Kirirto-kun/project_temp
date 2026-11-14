@@ -452,6 +452,7 @@ export async function connectAudio(deps: PlatformDeps, ownerId: string, ipHash: 
   const env = serverEnv();
   if (!deps.capabilities.coachVoice || !env.openaiRealtime) throw new ApiError('FEATURE_DISABLED', 'The voice call is not available right now. Continue by typing.');
   const attempt = await beginMediaAttempt(deps, ownerId, ipHash, id, expectedRevision, 'realtime', COST_ESTIMATES.realtimePerMinute);
+  await stopProviderSession(deps, attempt.current);
   let secret;
   try {
     secret = await mintRealtimeSecret({ apiKey: env.openaiRealtime.apiKey, model: env.openaiRealtime.model, voice: env.openaiRealtime.voice, transcribeModel: process.env.OPENAI_TRANSCRIBE_MODEL?.trim() || 'gpt-4o-mini-transcribe' });
@@ -480,7 +481,14 @@ export async function connectVideo(deps: PlatformDeps, ownerId: string, ipHash: 
     await abandonMediaAttempt(deps, ipHash, attempt);
     throw new ApiError('UPSTREAM_UNAVAILABLE', 'The video call could not start. Your answers are kept.', {}, 10);
   }
-  const { session } = await intakeStore(deps).update(id, (s) => openAttempt(s, 'video', attempt, token.sessionId));
+  let session;
+  try {
+    ({ session } = await intakeStore(deps).update(id, (s) => openAttempt(s, 'video', attempt, token.sessionId)));
+  } catch (error) {
+    await abandonMediaAttempt(deps, ipHash, attempt);
+    await liveAvatar.stopSession(token.sessionId).catch(() => undefined);
+    throw error;
+  }
   return { intake: view(deps, session), sessionToken: token.sessionToken, providerEpoch: session.providerEpoch, deadlineAt: session.deadlineAt! };
 }
 
