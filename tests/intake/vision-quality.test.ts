@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { coverage, qualify } from '@/onboarding/client/vision/quality'
 import { share, sustainedRuns, whenValid } from '@/onboarding/client/vision/runs'
+import { eventObservation, metricObservation, shareMetric, windowOf } from '@/onboarding/client/vision/observation'
 import { THRESHOLDS as T } from '@/onboarding/client/vision/thresholds'
 import { baseSample, shifted, timeline } from './vision-fixtures'
 
@@ -72,5 +73,42 @@ describe('sustainedRuns', () => {
 
   it('computes share over known time', () => {
     expect(share(q(1000), bright)).toEqual({ onMs: 1000, knownMs: 4900 })
+  })
+})
+
+describe('observation builders', () => {
+  const ctx = { recordingId: 'rec', modelVersion: 'test' }
+
+  it('eventObservation derives value and quality from the run', () => {
+    const o = eventObservation(ctx, 'head_turn_away', { startMs: 1000, endMs: 3500 })
+    expect(o).toMatchObject({
+      id: 'head_turn_away:1000', value: 2500, unit: 'ms', direction: null, quality: 1,
+      validMs: 2500, observedMs: 2500, unavailableReason: null,
+    })
+    expect(eventObservation(ctx, 'head_turn_away', { startMs: 1000, endMs: 3500 }, 'closer').direction).toBe('closer')
+  })
+
+  it('shareMetric is unavailable below summaryMinValidMs of known time', () => {
+    const q = qualify(timeline(0, 5000, 100), T)
+    const o = shareMetric(ctx, 'gaze_on_screen_share', q, whenValid(() => true), T, 'not_enough_valid_time')
+    expect(o.value).toBeNull()
+    expect(o.unavailableReason).toBe('not_enough_valid_time')
+  })
+
+  it('shareMetric excludes invalid samples from known time', () => {
+    const q = qualify(timeline(0, 20000, 100, (s) => (s.tMs >= 15000 ? { ...s, luma: 5 } : s)), T)
+    const o = shareMetric(ctx, 'gaze_on_screen_share', q, whenValid((x) => x.s.tMs < 5000), T, 'not_enough_valid_time')
+    expect(o.value).toBeCloseTo(5000 / 15000, 10)
+    expect(o.unavailableReason).toBeNull()
+    expect(o.quality).toBeCloseTo(15000 / 19900, 10)
+    expect(o.validMs).toBe(15000)
+    expect(o.observedMs).toBe(19900)
+  })
+
+  it('windowOf is empty for no samples and metricObservation gives quality 0 with no observed time', () => {
+    expect(windowOf([])).toEqual({ startMs: 0, endMs: 0 })
+    const o = metricObservation(ctx, 'smile_share', { startMs: 0, endMs: 0 }, null, 'ratio', 0, 0, 'no_face')
+    expect(o.quality).toBe(0)
+    expect(o.unavailableReason).toBe('no_face')
   })
 })
