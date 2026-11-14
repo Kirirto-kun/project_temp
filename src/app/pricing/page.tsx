@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: 'Pricing' };
 
 export default function PricingPage() {
   return (
-    <Page theme="light">
+    <Page>
       <Suspense fallback={<p className="text-muted">Loading…</p>}>
         <PricingScreen />
       </Suspense>

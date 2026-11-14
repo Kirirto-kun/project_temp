@@ -130,7 +130,7 @@ export function QuizFlow() {
       {step === 0 && (
         <section aria-labelledby="q-kind" className="grid gap-4">
           <p className="eyebrow m-0">Holdline</p>
-          <h1 id="q-kind" className="h-screen m-0">
+          <h1 id="q-kind" className="h-title m-0">
             What are you negotiating?
           </h1>
           <p className="m-0 text-[14px] text-muted">Pick one. You can change it later.</p>
@@ -156,7 +156,7 @@ export function QuizFlow() {
 
       {step === 1 && (
         <section aria-labelledby="q-role" className="grid gap-4">
-          <h1 id="q-role" className="h-screen m-0">
+          <h1 id="q-role" className="h-title m-0">
             Who will you be speaking with?
           </h1>
           <div className="grid gap-2" role="radiogroup" aria-labelledby="q-role">
@@ -180,7 +180,7 @@ export function QuizFlow() {
 
       {step === 2 && (
         <section className="grid gap-4">
-          <h1 className="h-screen m-0">{CURRENT_LABEL[kind].label}</h1>
+          <h1 className="h-title m-0">{CURRENT_LABEL[kind].label}</h1>
           {kind === 'bill' && (
             <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="How often">
               {(['month', 'one_time'] as const).map((p) => (
@@ -212,7 +212,7 @@ export function QuizFlow() {
 
       {step === 3 && (
         <section className="grid gap-4">
-          <h1 className="h-screen m-0">{TARGET_LABEL[kind]}</h1>
+          <h1 className="h-title m-0">{TARGET_LABEL[kind]}</h1>
           <MoneyField label="Your target in US dollars" valueMinor={state.draft.targetMinor} period={period} salaryScale={kind === 'raise' || kind === 'offer'} onChange={(v) => update({ targetMinor: v })} autoFocus />
           {state.draft.currentMinor && (
             <div className="flex flex-wrap gap-2" aria-label="Quick targets">
@@ -236,7 +236,7 @@ export function QuizFlow() {
 
       {step === 4 && (
         <section className="grid gap-4">
-          <h1 className="h-screen m-0">What range have you seen for this?</h1>
+          <h1 className="h-title m-0">What range have you seen for this?</h1>
           <p className="m-0 text-[14px] leading-5 text-muted">
             {objective === 'maximize' ? 'The high end becomes the ceiling of the simulation. It is your range, not a promise of what anyone pays.' : 'The low end becomes the floor of the simulation. It is your range, not a market estimate.'}
           </p>
@@ -288,7 +288,7 @@ export function QuizFlow() {
 
       {step === 5 && (
         <section className="grid gap-4">
-          <h1 className="h-screen m-0">What response worries you most?</h1>
+          <h1 className="h-title m-0">What response worries you most?</h1>
           <p className="m-0 text-[14px] text-muted">Optional. It shapes the objections, never the numbers.</p>
           <textarea className="input min-h-[96px]" maxLength={500} placeholder="They will say the budget is frozen." value={state.draft.fear ?? ''} onChange={(e) => update({ fear: e.target.value })} />
           <label className="grid gap-2">

@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: 'Talk to the coach' };
 
 export default function IntakePage() {
   return (
-    <Page theme="light" minimalHeader>
+    <Page minimalHeader>
       <IntakeEntry />
     </Page>
   );

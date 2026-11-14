@@ -78,7 +78,7 @@ export function DebriefScreen({ sessionId }: { sessionId: string }) {
   if (error && !debrief) {
     return (
       <div className="grid gap-4">
-        <h1 className="h-screen m-0">Debrief unavailable</h1>
+        <h1 className="h-title m-0">Debrief unavailable</h1>
         <p className="m-0 text-muted">{error}</p>
         <Link href="/example" className="btn btn-secondary w-fit">
           See the example debrief

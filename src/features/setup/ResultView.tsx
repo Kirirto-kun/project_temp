@@ -13,7 +13,7 @@ export function ResultView() {
   if (!d.kind || d.kind === 'custom' || !d.currentMinor || !d.targetMinor || !d.period) {
     return (
       <div className="grid gap-4">
-        <h1 className="h-screen m-0">Nothing to show yet</h1>
+        <h1 className="h-title m-0">Nothing to show yet</h1>
         <p className="m-0 text-muted">Start with the coach or the quick form, then come back here.</p>
         <div className="flex flex-wrap gap-3">
           <Link href="/intake" className="btn btn-primary">
@@ -34,7 +34,7 @@ export function ResultView() {
     <div className="mx-auto grid max-w-[560px] gap-6">
       <div>
         <p className="eyebrow m-0">Your round is ready</p>
-        <h1 className="h-screen m-0 mt-2">
+        <h1 className="h-title m-0 mt-2">
           {kind === 'raise' ? 'A raise' : kind === 'offer' ? 'A job offer' : kind === 'rent' ? 'Rent' : 'A bill'}, with your {(d.counterpartRole ?? 'counterpart').toLowerCase()}
         </h1>
       </div>

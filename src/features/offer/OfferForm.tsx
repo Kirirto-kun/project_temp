@@ -40,7 +40,7 @@ export function OfferForm() {
     <div className="mx-auto grid max-w-[640px] gap-5">
       <header>
         <p className="eyebrow m-0">Conversation pack</p>
-        <h1 className="h-screen m-0 mt-2">Read a real offer</h1>
+        <h1 className="h-title m-0 mt-2">Read a real offer</h1>
         <p className="m-0 mt-2 text-[14px] text-muted">Paste the offer text. Every amount is read from the text itself; anything not stated stays unknown. This is not a financial forecast.</p>
       </header>
       <textarea className="input min-h-[200px]" maxLength={20_000} value={text} onChange={(e) => setText(e.target.value)} aria-label="Offer text" />

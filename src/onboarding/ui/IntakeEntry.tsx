@@ -46,7 +46,7 @@ export function IntakeEntry() {
             <div className="label">AI practice coach</div>
           </div>
         </div>
-        <h1 className="h-screen m-0">Prepare for your next money conversation.</h1>
+        <h1 className="h-title m-0">Prepare for your next money conversation.</h1>
         <p className="m-0 text-muted">Tell me about your role and what you want to ask for. We’ll build your practice together.</p>
         <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
           <li className="chip">About 3–4 minutes</li>

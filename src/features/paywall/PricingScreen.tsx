@@ -52,7 +52,7 @@ export function PricingScreen() {
     <div className="mx-auto grid max-w-[560px] gap-6">
       <header>
         <p className="eyebrow m-0">Pricing</p>
-        <h1 className="h-screen m-0 mt-2">Practice is free. Your own scenario is a pack.</h1>
+        <h1 className="h-title m-0 mt-2">Practice is free. Your own scenario is a pack.</h1>
       </header>
       <div className="card grid gap-2 p-4">
         <div className="label">Free</div>

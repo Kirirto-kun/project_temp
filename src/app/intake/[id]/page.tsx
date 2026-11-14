@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: 'Coach' };
 export default async function IntakeSessionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   return (
-    <Page theme="light" minimalHeader>
+    <Page minimalHeader>
       <IntakeScreen id={id} />
     </Page>
   );

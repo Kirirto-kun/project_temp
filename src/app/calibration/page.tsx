@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: 'Calibrate your voice' };
 
 export default function CalibrationPage() {
   return (
-    <Page theme="light" minimalHeader>
+    <Page minimalHeader>
       <CalibrationFlow />
     </Page>
   );

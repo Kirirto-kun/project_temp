@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: 'Set up your round' };
 
 export default function QuizPage() {
   return (
-    <Page theme="light" minimalHeader>
+    <Page minimalHeader>
       <QuizFlow />
     </Page>
   );

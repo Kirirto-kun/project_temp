@@ -24,7 +24,7 @@ export function OpponentPicker() {
     <div className="grid gap-6">
       <div>
         <p className="eyebrow m-0">Counterpart</p>
-        <h1 className="h-screen m-0 mt-2">Who will you practise against?</h1>
+        <h1 className="h-title m-0 mt-2">Who will you practise against?</h1>
         <p className="m-0 mt-2 text-[14px] text-muted">Each one says no differently. The numbers come from your range either way.</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Counterparts">

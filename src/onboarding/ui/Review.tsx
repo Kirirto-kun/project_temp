@@ -175,7 +175,7 @@ export function Review({ view, onView }: { view: IntakeView; onView: (v: IntakeV
   if (view.inputMode === 'example') {
     return (
       <div className="mx-auto grid max-w-[640px] gap-4">
-        <h1 className="h-screen m-0">Example practice</h1>
+        <h1 className="h-title m-0">Example practice</h1>
         <p className="m-0 text-muted">You chose an example in US dollars: a raise from $95,000 to $110,000 a year with a $100,000–$112,000 range. It is not your personal situation.</p>
         <button type="button" className="btn btn-primary btn-xl" disabled={busy} onClick={() => void confirm()}>
           Start my practice
@@ -189,7 +189,7 @@ export function Review({ view, onView }: { view: IntakeView; onView: (v: IntakeV
       <section className="grid gap-4" aria-labelledby="brief">
         <div>
           <p className="eyebrow m-0">Review</p>
-          <h1 id="brief" className="h-screen m-0 mt-2">
+          <h1 id="brief" className="h-title m-0 mt-2">
             Your practice brief
           </h1>
           <p className="m-0 mt-2 text-[14px] text-muted">Here is what I heard. Check the numbers before we continue; nothing is used until you confirm.</p>

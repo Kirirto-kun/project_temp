@@ -60,7 +60,7 @@ export function CustomScenarioForm() {
     <div className="mx-auto grid max-w-[560px] gap-5">
       <header>
         <p className="eyebrow m-0">Conversation pack</p>
-        <h1 className="h-screen m-0 mt-2">Describe your own conversation</h1>
+        <h1 className="h-title m-0 mt-2">Describe your own conversation</h1>
         <p className="m-0 mt-2 text-[14px] text-muted">For example a freelance rate, a car price or a card interest rate. The limits still come only from your numbers.</p>
       </header>
       <label className="grid gap-2">

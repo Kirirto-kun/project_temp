@@ -1,60 +1,105 @@
-/* Holdline brandbook v2 tokens. Never retype hex values in components. */
+/*
+ * Holdline design tokens: white + violet.
+ * Components read only these variables; never retype hex values in components.
+ * Light is the default. Dark applies only when the user picks it (data-theme="dark").
+ */
 :root,
 [data-theme='light'] {
-  --paper: #f4f6f8;
-  --raised: #ffffff;
-  --line: #dce1e7;
-  --ink: #101820;
-  --muted: #5a6674;
-  --hold: #1b4dff;
-  --on-hold: #ffffff;
-  --hold-tint: #e4ebff;
-  --won: #0e7a3e;
-  --won-tint: #ddf3e6;
-  --gap: #b45309;
-  --gap-tint: #fbebd6;
-  --shadow-raise: 0 1px 2px rgba(16, 24, 32, 0.08);
-  color-scheme: light;
-}
+  /* Violet scale. 600 is the brand. */
+  --violet-50: #f5f3ff;
+  --violet-100: #ede9fe;
+  --violet-200: #ddd5ff;
+  --violet-300: #c3b5ff;
+  --violet-400: #a08bff;
+  --violet-500: #7c63ff;
+  --violet-600: #5b42f3;
+  --violet-700: #4a31d6;
+  --violet-800: #3b27a8;
+  --violet-900: #2d1f7a;
+  --violet-950: #1b1250;
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --paper: #0c1218;
-    --raised: #151d26;
-    --line: #26303b;
-    --ink: #eef1f5;
-    --muted: #9aa6b4;
-    --hold: #6c8bff;
-    --on-hold: #0c1218;
-    --hold-tint: #1a2646;
-    --won: #3dd68c;
-    --won-tint: #10301f;
-    --gap: #ffb454;
-    --gap-tint: #33250f;
-    --shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.5);
-    color-scheme: dark;
-  }
+  /* Surfaces */
+  --paper: #ffffff;
+  --paper-subtle: #f8f7fc;
+  --raised: #ffffff;
+  --sunken: #f3f1fa;
+  --line: rgba(17, 14, 36, 0.08);
+  --line-strong: rgba(17, 14, 36, 0.14);
+
+  /* Text */
+  --ink: #110e24;
+  --ink-soft: #3a3654;
+  --muted: #6b6783;
+
+  /* Brand roles */
+  --hold: var(--violet-600);
+  --hold-strong: var(--violet-700);
+  --hold-text: var(--violet-600);
+  --on-hold: #ffffff;
+  --hold-tint: var(--violet-50);
+  --hold-tint-strong: var(--violet-100);
+  --spark: #c8f560;
+
+  /* Meaning: money gained / money left on the table */
+  --won: #0b8a4a;
+  --won-tint: #e4f7ec;
+  --gap: #c2410c;
+  --gap-tint: #fff0e6;
+
+  /* Depth: semi-transparent rings and soft, violet-tinted shadows */
+  --ring: 0 0 0 1px var(--line);
+  --shadow-xs: 0 1px 2px rgba(17, 14, 36, 0.05);
+  --shadow-raise: 0 0 0 1px rgba(17, 14, 36, 0.06), 0 1px 2px rgba(17, 14, 36, 0.04), 0 6px 20px -8px rgba(45, 31, 122, 0.12);
+  --shadow-lift: 0 0 0 1px rgba(17, 14, 36, 0.06), 0 2px 4px rgba(17, 14, 36, 0.04), 0 18px 40px -12px rgba(45, 31, 122, 0.22);
+  --shadow-hold: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 1px 2px rgba(27, 18, 80, 0.3), 0 8px 20px -8px rgba(91, 66, 243, 0.65);
+
+  /* Glass header */
+  --glass: rgba(255, 255, 255, 0.72);
+
+  color-scheme: light;
 }
 
 :root[data-theme='dark'],
 [data-theme='dark'] {
-  --paper: #0c1218;
-  --raised: #151d26;
-  --line: #26303b;
-  --ink: #eef1f5;
-  --muted: #9aa6b4;
-  --hold: #6c8bff;
-  --on-hold: #0c1218;
-  --hold-tint: #1a2646;
-  --won: #3dd68c;
-  --won-tint: #10301f;
-  --gap: #ffb454;
-  --gap-tint: #33250f;
-  --shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --paper: #0b0916;
+  --paper-subtle: #100d1f;
+  --raised: #161229;
+  --sunken: #1c1733;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+
+  --ink: #f4f2ff;
+  --ink-soft: #cbc6e2;
+  --muted: #9b96b7;
+
+  --hold: #6e57ff;
+  --hold-strong: #7c67ff;
+  --hold-text: #ab9dff;
+  --on-hold: #ffffff;
+  --hold-tint: rgba(124, 99, 255, 0.12);
+  --hold-tint-strong: rgba(124, 99, 255, 0.2);
+
+  --won: #4ade80;
+  --won-tint: rgba(74, 222, 128, 0.12);
+  --gap: #ffa066;
+  --gap-tint: rgba(255, 160, 102, 0.12);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-raise: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -10px rgba(0, 0, 0, 0.6);
+  --shadow-lift: 0 0 0 1px rgba(255, 255, 255, 0.09), 0 2px 4px rgba(0, 0, 0, 0.4), 0 24px 48px -16px rgba(0, 0, 0, 0.7);
+  --shadow-hold: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px -8px rgba(110, 87, 255, 0.6);
+
+  --glass: rgba(11, 9, 22, 0.72);
+
   color-scheme: dark;
 }
 
-/* A forced light scope inside a dark system theme (funnel screens). */
-[data-theme='light'] {
-  color-scheme: light;
+:root {
+  /* Motion. Strong curves from Emil Kowalski's design-engineering rules; never ease-in on UI. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-press: 160ms;
+  --dur-fast: 200ms;
+  --dur-base: 260ms;
 }

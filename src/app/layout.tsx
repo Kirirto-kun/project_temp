@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Inter_Tight, JetBrains_Mono } from 'next/font/google';
+import { Geist, Geist_Mono, Instrument_Serif } from 'next/font/google';
+import { Toaster } from '@/components/ui/toaster';
 import '@/styles/globals.css';
 
-const interTight = Inter_Tight({ subsets: ['latin'], weight: ['600', '700'], variable: '--font-inter-tight', display: 'swap' });
-const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-inter', display: 'swap' });
-const jetbrains = JetBrains_Mono({ subsets: ['latin'], weight: ['500'], variable: '--font-jetbrains', display: 'swap' });
+const geist = Geist({ subsets: ['latin'], variable: '--font-geist', display: 'swap' });
+const geistMono = Geist_Mono({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-geist-mono', display: 'swap' });
+const instrumentSerif = Instrument_Serif({ subsets: ['latin'], weight: '400', style: 'italic', variable: '--font-instrument-serif', display: 'swap' });
 
 export const metadata: Metadata = {
   title: { default: 'Holdline — rehearse the money conversation', template: '%s · Holdline' },
@@ -15,21 +16,24 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f4f6f8' },
-    { media: '(prefers-color-scheme: dark)', color: '#0c1218' },
-  ],
+  viewportFit: 'cover',
+  interactiveWidget: 'resizes-content',
+  themeColor: '#ffffff',
 };
 
-const themeScript = `(function(){try{var t=localStorage.getItem('hl-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}})()`;
+/** Light is the default. Dark applies only when the visitor picked it; set before paint to avoid a flash. */
+const themeScript = `(function(){try{if(localStorage.getItem('hl-theme')==='dark'){var r=document.documentElement;r.setAttribute('data-theme','dark');var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content','#0b0916')}}catch(e){}})()`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${interTight.variable} ${inter.variable} ${jetbrains.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Toaster />
+      </body>
     </html>
   );
 }

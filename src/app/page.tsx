@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: 'Rehearse the money conversation' };
 
 export default function LandingPage() {
   return (
-    <Page theme="dark">
+    <Page>
       <section className="card grid justify-items-start gap-4 px-6 py-8 sm:px-8" aria-labelledby="hero-title">
         <p className="eyebrow m-0">Negotiation simulator</p>
         <h1 id="hero-title" className="h-display m-0 max-w-[17ch]">

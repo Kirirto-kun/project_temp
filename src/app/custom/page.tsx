@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: 'Your own scenario' };
 
 export default function CustomPage() {
   return (
-    <Page theme="light">
+    <Page>
       <CustomScenarioForm />
     </Page>
   );

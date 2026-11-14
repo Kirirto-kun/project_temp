@@ -138,7 +138,7 @@ export function CalibrationFlow() {
     <div className="mx-auto grid max-w-[560px] gap-6">
       <div>
         <p className="eyebrow m-0">Optional · 20 seconds</p>
-        <h1 className="h-screen m-0 mt-2">Calibrate your voice</h1>
+        <h1 className="h-title m-0 mt-2">Calibrate your voice</h1>
         <p className="m-0 mt-2 text-[15px] leading-6 text-muted">
           Read a neutral text so the debrief can compare your pace, pauses and pitch with your own normal. Only your microphone is recorded, it is sent for transcription, and the audio is deleted after the
           analysis (never kept longer than 24 hours). Skipping is fine: you will get absolute values instead.

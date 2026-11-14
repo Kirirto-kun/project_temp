@@ -107,7 +107,7 @@ export function SessionScreen({ id }: { id: string }) {
   if (loadError) {
     return (
       <div className="grid gap-4">
-        <h1 className="h-screen m-0">Round not found</h1>
+        <h1 className="h-title m-0">Round not found</h1>
         <p className="m-0 text-muted">{loadError}</p>
         <Link href="/quiz" className="btn btn-primary w-fit">
           Set up a new round

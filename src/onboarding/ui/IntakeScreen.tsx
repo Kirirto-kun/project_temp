@@ -24,7 +24,7 @@ export function IntakeScreen({ id }: { id: string }) {
   if (error) {
     return (
       <div className="grid gap-4">
-        <h1 className="h-screen m-0">Session not found</h1>
+        <h1 className="h-title m-0">Session not found</h1>
         <p className="m-0 text-muted">{error}</p>
         <div className="flex gap-3">
           <Link href="/intake" className="btn btn-primary">
