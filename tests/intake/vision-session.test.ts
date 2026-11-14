@@ -126,6 +126,16 @@ describe('createVisionSession', () => {
     expect(updates.at(-1)!.tier).toBe('full')
   })
 
+  it('ignores warm-up frames when benchmarking a tier', async () => {
+    let n = 0
+    const { session, calls, updates } = setup({ inferenceMs: () => (n++ < 3 ? 500 : 20) })
+    await session.start()
+    await until(() => calls.frames > 40)
+    await session.stop()
+    expect(calls.inits).toEqual(['heavy'])
+    expect(updates.at(-1)!.tier).toBe('heavy')
+  })
+
   it('uploads finalised events while running and returns a summary on stop', async () => {
     const sampleAt = (t: number) => (t >= 5000 && t < 8000 ? withFace(baseSample(t), { yawDeg: 40 }) : baseSample(t))
     const { session, calls, uploader } = setup({ sampleAt })

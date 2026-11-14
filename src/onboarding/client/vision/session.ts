@@ -58,6 +58,8 @@ export type VisionSession = {
 /** Heavy/full limits follow the pacing budget (60% of the 100 ms frame at 10 fps). */
 const TIER_LIMITS: readonly (readonly [PoseTier, number])[] = [['heavy', 40], ['full', 60]]
 const BENCHMARK_FRAMES = 20
+/** First frames after init compile GPU shaders and warm caches; they say nothing about steady speed. */
+const WARMUP_FRAMES = 5
 const UPDATE_EVERY_MS = 1000
 /** Events ending this long ago will not grow any more and are safe to upload. */
 const FINALIZE_LAG_MS = 3000
@@ -145,12 +147,14 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
       await source.init({ tier: candidate, enableHands: o.enableHands })
       tier = candidate
       const times: number[] = []
-      for (let attempts = 0; running && times.length < BENCHMARK_FRAMES && attempts < BENCHMARK_FRAMES * 5; attempts++) {
+      const needed = WARMUP_FRAMES + BENCHMARK_FRAMES
+      for (let attempts = 0; running && times.length < needed && attempts < needed * 5; attempts++) {
         const ms = await step()
         if (ms === null) await sleep(50)
         else times.push(ms)
       }
-      if (times.length > 0 && p95(times) < limit) return candidate
+      const steady = times.slice(WARMUP_FRAMES)
+      if (steady.length > 0 && p95(steady) < limit) return candidate
     }
     if (!running || !source) return 'lite'
     await source.init({ tier: 'lite', enableHands: o.enableHands })
