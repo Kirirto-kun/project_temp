@@ -5,9 +5,9 @@
 :root {
   --paper: #f4f6f8; --raised: #ffffff; --line: #dce1e7; --ink: #101820; --muted: #5a6674;
   --hold: #1b4dff; --on-hold: #ffffff; --hold-tint: #e4ebff; --won: #0e7a3e; --gap: #b45309;
-  --font-display-stack: "Inter Tight", Inter, "Helvetica Neue", Arial, sans-serif;
-  --font-sans-stack: Inter, "Helvetica Neue", Arial, sans-serif;
-  --font-mono-stack: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --font-display-stack: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-sans-stack: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono-stack: ui-monospace, Menlo, Consolas, monospace;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {

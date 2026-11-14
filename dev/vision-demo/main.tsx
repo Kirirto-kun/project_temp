@@ -9,7 +9,8 @@ import type { LandmarkSample, Moment, SpeechTurn, VisualSummary } from '@/onboar
 import { createEventsUploader } from '@/onboarding/client/vision/upload'
 import { VisualReport } from '@/onboarding/ui/VisualReport'
 
-type Live = { session: VisionSession; stream: MediaStream; t0: number; turns: SpeechTurn[]; speakingSince: number | null; server: ReturnType<typeof createMockEventsServer> }
+type Uploader = ReturnType<typeof createEventsUploader>
+type Live = { session: VisionSession; uploader: Uploader; stream: MediaStream; t0: number; turns: SpeechTurn[]; speakingSince: number | null; server: ReturnType<typeof createMockEventsServer> }
 
 function App() {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -44,7 +45,8 @@ function App() {
       if (!l) return
       live.current = null
       release(l)
-      void l.session.stop().catch(() => {})
+      setPhase('idle')
+      void l.session.stop().catch(() => {}).finally(() => l.uploader.dispose())
     }
     window.addEventListener('pagehide', onPageHide)
     return () => window.removeEventListener('pagehide', onPageHide)
@@ -63,6 +65,7 @@ function App() {
     lastSamples.current = null
     let stream: MediaStream | null = null
     let session: VisionSession | null = null
+    let uploader: Uploader | null = null
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360 }, audio: false })
       const video = videoRef.current!
@@ -70,14 +73,22 @@ function App() {
       await video.play()
       const t0 = performance.now()
       const server = createMockEventsServer()
-      const uploader = createEventsUploader({ intakeId: 'demo', consentVersion: 1, fetchImpl: server.fetchImpl, onError: (e) => console.warn(e) })
+      const up = uploader = createEventsUploader({ intakeId: 'demo', consentVersion: 1, fetchImpl: server.fetchImpl, onError: (e) => console.warn(e) })
       let lastUi = 0
       session = createVisionSession({
-        video, clock: () => performance.now() - t0, recordingId: 'demo-recording', consent, enableHands: hands, uploader,
-        onUpdate: (u) => { setUpdate(u); setBatches(server.batches.length) },
+        video, clock: () => performance.now() - t0, recordingId: 'demo-recording', consent, enableHands: hands, uploader: up,
+        onUpdate: (u) => {
+          setUpdate(u)
+          setBatches(server.batches.length)
+          // The session gave up (model failure or slow device): free the camera now; Stop still collects the summary.
+          if (u.status === 'off') {
+            stream?.getTracks().forEach((track) => track.stop())
+            video.srcObject = null
+          }
+        },
         onSample: (s) => { if (s.tMs - lastUi > 200) { lastUi = s.tMs; setLast(s) } },
       })
-      live.current = { session, stream, t0, turns: [], speakingSince: null, server }
+      live.current = { session, uploader: up, stream, t0, turns: [], speakingSince: null, server }
       await session.start()
       setPhase('live')
     } catch (err) {
@@ -85,6 +96,7 @@ function App() {
       if (videoRef.current) videoRef.current.srcObject = null
       live.current = null
       await session?.stop().catch(() => {})
+      uploader?.dispose()
       setPhase('idle')
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -108,6 +120,7 @@ function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
+      l.uploader.dispose() // after the session's final flush
       release(l)
       setPhase('idle')
     }
