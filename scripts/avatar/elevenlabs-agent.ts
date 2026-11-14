@@ -45,10 +45,45 @@ export function agentPatch(toolIds: string[]) {
   };
 }
 
+export interface ToolRecord {
+  id: string;
+  tool_config?: Record<string, unknown>;
+}
+
+const COMPARED_KEYS = ['name', 'description', 'expects_response', 'response_timeout_secs', 'parameters'] as const;
+
+const sortKeys = (value: unknown): unknown =>
+  Array.isArray(value)
+    ? value.map(sortKeys)
+    : value && typeof value === 'object'
+      ? Object.fromEntries(Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, sortKeys(v)]))
+      : value;
+
+/** Canonical form of only the fields we manage, so server-added fields do not count as drift. */
+const comparable = (config: Record<string, unknown> | undefined) =>
+  JSON.stringify(sortKeys(Object.fromEntries(COMPARED_KEYS.map((k) => [k, config?.[k] ?? undefined]))));
+
+/** The workspace client tool that is the coach tool `name`, if any (same name AND type client). */
+export function findCoachTool(tools: ToolRecord[], name: string): ToolRecord | undefined {
+  return tools.find((t) => t.tool_config?.name === name && t.tool_config?.type === 'client');
+}
+
+/** Which coach tools need a PATCH (config differs) and which must be created. In-sync tools appear in neither. */
+export function planToolSync(tools: ToolRecord[]): { update: { id: string; config: ClientToolConfig }[]; create: ClientToolConfig[] } {
+  const update: { id: string; config: ClientToolConfig }[] = [];
+  const create: ClientToolConfig[] = [];
+  for (const config of clientToolConfigs()) {
+    const existing = findCoachTool(tools, config.name);
+    if (!existing) create.push(config);
+    else if (comparable(existing.tool_config) !== comparable(config as unknown as Record<string, unknown>)) update.push({ id: existing.id, config });
+  }
+  return { update, create };
+}
+
 const short = (s: string | undefined) => (s === undefined ? '(none)' : s.length > 60 ? `${s.slice(0, 57)}…` : s);
 
-/** Human-readable differences between the live agent and what the code expects. */
-export function describeDrift(agent: AgentSnapshot, attachedToolNames: string[]): string[] {
+/** Human-readable differences between the live agent (and workspace tools) and what the code expects. */
+export function describeDrift(agent: AgentSnapshot, tools: ToolRecord[]): string[] {
   const a = agent.conversation_config?.agent;
   const lines: string[] = [];
   if (a?.prompt?.prompt !== COACH_INSTRUCTIONS) lines.push('prompt: will be replaced with the audio coach instructions');
@@ -56,7 +91,15 @@ export function describeDrift(agent: AgentSnapshot, attachedToolNames: string[])
   if (a?.first_message !== GREETING) lines.push(`first message: "${short(a?.first_message)}" → "${short(GREETING)}"`);
   const format = agent.conversation_config?.tts?.agent_output_audio_format;
   if (format !== OUTPUT_FORMAT) lines.push(`output format: ${format ?? '(default)'} → ${OUTPUT_FORMAT}`);
-  const missing = COACH_TOOLS.map((t) => t.name).filter((n) => !attachedToolNames.includes(n));
+  const attached = a?.prompt?.tool_ids ?? [];
+  const coachTools = clientToolConfigs().map((config) => ({ config, record: findCoachTool(tools, config.name) }));
+  const missing = coachTools.filter((c) => !c.record || !attached.includes(c.record.id)).map((c) => c.config.name);
   if (missing.length) lines.push(`client tools to attach: ${missing.join(', ')}`);
+  for (const { config, record } of coachTools) {
+    if (record && comparable(record.tool_config) !== comparable(config as unknown as Record<string, unknown>)) lines.push(`tool ${config.name}: config will be updated`);
+  }
+  const coachIds = new Set(coachTools.flatMap((c) => (c.record ? [c.record.id] : [])));
+  const detach = attached.filter((id) => !coachIds.has(id)).map((id) => (tools.find((t) => t.id === id)?.tool_config?.name as string | undefined) ?? id);
+  if (detach.length) lines.push(`tools to detach: ${detach.join(', ')}`);
   return lines;
 }
