@@ -1,5 +1,15 @@
 import 'server-only';
 
+/** LiveAvatar LITE video coach bound to the ElevenLabs coach agent. */
+export interface LiveAvatarEnv {
+  mode: 'dev' | 'on';
+  apiKey: string;
+  avatarId: string;
+  secretId: string;
+  agentId: string;
+  sandbox: boolean;
+}
+
 export interface ServerEnv {
   nodeEnv: string;
   isProduction: boolean;
@@ -12,6 +22,7 @@ export interface ServerEnv {
   llmProvider: string;
   elevenlabs: { apiKey: string; agentId: string | null; customLlmSecret: string | null; sttModel: string; voiceMap: Record<string, string> } | null;
   openaiRealtime: { apiKey: string; model: string; voice: string } | null;
+  liveAvatar: LiveAvatarEnv | null;
   s3: { endpoint: string; region: string; bucket: string; accessKeyId: string; secretAccessKey: string } | null;
   polar: { accessToken: string; webhookSecret: string; productId: string; server: 'sandbox' | 'production'; priceMinor: number } | null;
   dailyBudgetMicros: number | null;
@@ -39,6 +50,24 @@ function parseVoiceMap(raw: string | null): Record<string, string> {
   } catch {
     return {};
   }
+}
+
+/**
+ * The avatar call is opt-in. `dev` works only outside production (LiveAvatar sandbox unless
+ * LIVEAVATAR_SANDBOX=false); `on` only once a person marks the custom avatar approved, so
+ * production never shows a stock face.
+ */
+function readLiveAvatar(env: NodeJS.ProcessEnv, isProduction: boolean): LiveAvatarEnv | null {
+  const flag = str(env.AVATAR_CALL)?.toLowerCase();
+  if (flag !== 'dev' && flag !== 'on') return null;
+  if (flag === 'dev' && isProduction) return null;
+  if (flag === 'on' && env.LIVEAVATAR_AVATAR_APPROVED !== 'true') return null;
+  const apiKey = str(env.LIVEAVATAR_API_KEY);
+  const avatarId = str(env.LIVEAVATAR_AVATAR_ID);
+  const secretId = str(env.LIVEAVATAR_ELEVENLABS_SECRET_ID);
+  const agentId = str(env.ELEVENLABS_COACH_AGENT_ID);
+  if (!apiKey || !avatarId || !secretId || !agentId) return null;
+  return { mode: flag, apiKey, avatarId, secretId, agentId, sandbox: flag === 'dev' && env.LIVEAVATAR_SANDBOX !== 'false' };
 }
 
 let cached: ServerEnv | null = null;
@@ -89,6 +118,7 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
         }
       : null,
     openaiRealtime: openaiKey && realtimeModel ? { apiKey: openaiKey, model: realtimeModel, voice: str(env.OPENAI_REALTIME_VOICE) ?? 'marin' } : null,
+    liveAvatar: readLiveAvatar(env, isProduction),
     s3:
       s3Endpoint && s3Bucket && s3Key && s3Secret
         ? { endpoint: s3Endpoint.replace(/\/$/, ''), region: str(env.S3_REGION) ?? 'auto', bucket: s3Bucket, accessKeyId: s3Key, secretAccessKey: s3Secret }

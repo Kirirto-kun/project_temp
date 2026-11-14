@@ -23,7 +23,7 @@ export function computeCapabilities(env: ServerEnv, storage: { durable: boolean;
     offerAnalysis: payments,
     voiceClone: false,
     payments,
-    avatarIntake: false,
+    avatarIntake: spendOk && env.liveAvatar !== null,
     coachIntake: true,
     coachVoice: spendOk && env.openaiRealtime !== null,
     visualIntake: false,
