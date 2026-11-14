@@ -43,8 +43,11 @@ export function templateReply(action: CounterpartAction, ctx: ActorContext): str
     case 'probe':
       return pick(t.probe, seed);
     case 'object': {
-      const objection = config.objections.find((o) => o.id === action.objectionId);
-      return `${pick(t.objectPrefix, seed)}${objection?.text ?? pick(t.hold, seed)}`.replace(/^([a-z])/, (c) => c.toUpperCase());
+      const objection = config.objections.find((o) => o.id === action.objectionId)?.text ?? pick(t.hold, seed);
+      const prefix = pick(t.objectPrefix, seed);
+      if (!prefix) return objection;
+      const continued = /^I\b/.test(objection) ? objection : objection.charAt(0).toLowerCase() + objection.slice(1);
+      return `${prefix}${continued}`;
     }
     case 'hold': {
       if (ctx.move.type === 'state_number' && ctx.move.amountMinor === null) return pick(t.clarify, seed);
