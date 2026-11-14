@@ -22,10 +22,10 @@ When the avatar is enabled, the intake's primary Start opens a video call with A
 | Value | Behaviour |
 |---|---|
 | `off` | Video is never offered; intake behaves exactly as main today. |
-| `dev` | Allowed only when `NODE_ENV !== 'production'`. Sessions use `is_sandbox: true`; any avatar ID is accepted. |
-| `on` | Requires `LIVEAVATAR_AVATAR_APPROVED=true` (set by a person once the custom avatar is approved). Otherwise the server treats the flag as `off` and logs a configuration error. |
+| `dev` | Allowed only when `NODE_ENV !== 'production'`. Sessions use `is_sandbox: true` unless `LIVEAVATAR_SANDBOX=false`. LiveAvatar's sandbox is free but accepts only the Wayne avatar (`dd73ea75-1218-4ef3-92ce-606d5f7fbc0a`) and ends sessions after about one minute; full-length test calls set `LIVEAVATAR_SANDBOX=false` with any stock avatar (uses credits). |
+| `on` | Requires `LIVEAVATAR_AVATAR_APPROVED=true` (set by a person once the custom avatar is approved); never sandbox. Otherwise the server treats the flag as `off`. |
 
-Required when not `off`: `LIVEAVATAR_API_KEY`, `LIVEAVATAR_AVATAR_ID`, `LIVEAVATAR_ELEVENLABS_SECRET_ID`, `ELEVENLABS_COACH_AGENT_ID`. Missing values mean `off`. `/api/config` and the intake view's `availability` report `coachVideo: boolean`, next to the existing `coachVoice`.
+Required when not `off`: `LIVEAVATAR_API_KEY`, `LIVEAVATAR_AVATAR_ID`, `LIVEAVATAR_ELEVENLABS_SECRET_ID`, `ELEVENLABS_COACH_AGENT_ID`. Missing values mean `off`. The existing (so far always false) capability `avatarIntake` becomes true when the flag resolves to `dev`/`on` and the spend ceiling allows paid providers; `/api/config` and the intake view's `availability` report it next to `coachVoice`.
 
 ## Architecture
 
@@ -38,8 +38,7 @@ Browser  AvatarCoach.tsx
 Server   POST /api/intake/:id/connect { expectedRevision, mode: 'video' }
            → connectVideo(): quota + budget reserve → LiveAvatar POST /v1/sessions/token
              { mode: 'LITE', avatar_id, is_sandbox, max_session_duration,
-               elevenlabs_agent_config: { secret_id, agent_id,
-                 dynamic_variables: { intake_id, provider_epoch } } }
+               elevenlabs_agent_config: { secret_id, agent_id } }   (no dynamic variables: the browser holds the intake id)
            → stores providerSessionId on the intake; returns { intake, sessionToken, providerEpoch, deadlineAt }
          stopMedia(): additionally calls LiveAvatar POST /v1/sessions/stop when a providerSessionId is set
 ```
@@ -48,10 +47,10 @@ Server   POST /api/intake/:id/connect { expectedRevision, mode: 'video' }
 
 | File | Responsibility |
 |---|---|
-| `src/onboarding/server/liveavatar.ts` | `createLiveAvatar({ apiKey, fetchImpl })`: `mintToken`, `stopSession`, `getSession`. Typed Zod responses; 15 s / 5 s timeouts. |
+| `src/onboarding/server/liveavatar.ts` | `createLiveAvatar(settings, fetchImpl)`: `mintToken`, `stopSession` (an unknown or already-ended session counts as stopped). Zod-checked response; 15 s / 8 s timeouts. Injected as `PlatformDeps.liveAvatar`. |
 | `src/onboarding/server/service.ts` | `connectVideo`; `stopMedia` stops the provider session; video budget estimate. |
-| `src/onboarding/contracts.ts` | `mode: 'text' \| 'audio' \| 'video'`; `providerSessionId` on the stored session (never in the view). |
-| `src/server/env.ts`, `src/server/capabilities.ts`, `src/contracts/api.ts` | `serverEnv().liveAvatar` parses the flag and the four values; capabilities add `coachVideo` (spend ceiling OK and `liveAvatar` configured); the config contract and intake `availability` expose it. |
+| `src/onboarding/contracts.ts`, `server/view.ts`, `server/limits/budget.ts` | `mode: 'text' \| 'audio' \| 'video'`; optional `providerSessionId` on the stored session (never in the view); `availability.avatarIntake`; budget category `avatar` with a conservative `avatarPerMinute`. |
+| `src/server/env.ts`, `src/server/capabilities.ts` | `serverEnv().liveAvatar` parses the flag and the four values; `avatarIntake` = spend ceiling OK and `liveAvatar` configured. |
 | `src/app/api/intake/[id]/connect/route.ts` | Accepts `mode` (`audio` default) and dispatches. |
 | `src/onboarding/client/avatar-session.ts` | SDK wrapper: muted start, microphone-state check, captions, tool calls, response corrections, disconnects, keep-alive. |
 | `src/onboarding/client/avatar-call.ts` | Lifecycle controller: generation guard against stale attempts, 15 s connect timeout, heartbeat/keep-alive, serial tool queue with revision retry, End that releases the mic locally and stops on the server independently. |
@@ -69,7 +68,7 @@ The ElevenLabs agent uses `COACH_INSTRUCTIONS` and `COACH_TOOLS` from `src/onboa
 - Connect: quota and budget are consumed before minting; a failed mint refunds both and returns `UPSTREAM_UNAVAILABLE`, and the client falls back to the audio call (then text).
 - The SDK starts muted; the client unmutes only after the session is started, the microphone reports `ACTIVE`, and the attempt is still current.
 - 15 s without a connected session ends the attempt with a message and fallback; answers stay saved.
-- Disconnect, End, deadline and review all release the microphone immediately and call `/stop`. If the server cannot stop the provider session, the intake stays `stopping` and main's existing cleanup retries it.
+- Disconnect, End, deadline and review all release the microphone immediately and call `/stop`, which closes the intake and stops the provider session best effort. Main has no cleanup job, so the backstop for a missed stop is LiveAvatar's own `max_session_duration` (the remaining intake minutes, at most 300 s); handoff's existing `ensureMediaClosed` also stops it. Reconnecting stops the previous provider session first.
 - Stale events (old `providerEpoch` or an earlier client generation) are ignored on both sides.
 
 ## Testing
