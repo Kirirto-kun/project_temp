@@ -88,7 +88,7 @@ Files (under `src/onboarding/client/vision/` unless noted):
 
 ## Performance
 
-- Lobby benchmark: 20 frames per tier. Choose Heavy if p95 per-frame < 40 ms, Full if < 70 ms, else Lite.
+- Lobby benchmark: 20 frames per tier. Choose Heavy if p95 per-frame < 40 ms, Full if < 60 ms, else Lite.
 - Hands run every second frame. Budget overrun backoff: 10 fps → 5 fps → hands off → visual analysis off with reason `device_too_slow`. The conversation is never affected.
 - React receives updates at most 1 Hz. Samples live in a bounded ring buffer (≤ 5 minutes); no raw landmarks are stored or uploaded.
 

@@ -47,7 +47,8 @@ export type VisionSession = {
   getObservations(): Observation[]
 }
 
-const TIER_LIMITS: readonly (readonly [PoseTier, number])[] = [['heavy', 40], ['full', 70]]
+/** Heavy/full limits follow the pacing budget (60% of the 100 ms frame at 10 fps). */
+const TIER_LIMITS: readonly (readonly [PoseTier, number])[] = [['heavy', 40], ['full', 60]]
 const BENCHMARK_FRAMES = 20
 const UPDATE_EVERY_MS = 1000
 /** Events ending this long ago will not grow any more and are safe to upload. */
@@ -69,7 +70,8 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
   let status: VisionStatus = 'starting'
   let offReason: UnavailableReason | null = null
   let running = false
-  let loop: Promise<void> | null = null
+  let started = false
+  let stopping: Promise<VisualSummary> | null = null
   let lastT = -1
   let frameIndex = 0
   let lastUpdateT = 0
@@ -84,16 +86,19 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
   }
 
   async function step(): Promise<number | null> {
+    const clockMs = o.clock() // before grabbing, so a throwing clock cannot leak a frame
     const frame = await grab(o.video)
     if (!frame) return null
-    if (!source) {
+    const src = source
+    if (!running || !src) {
       frame.close()
       return null
     }
-    const tMs = Math.max(o.clock(), lastT + 1)
+    const tMs = Math.max(clockMs, lastT + 1)
     lastT = tMs
     const hands: HandsMode = !pacing.hands ? 'off' : frameIndex++ % 2 === 0 ? 'run' : 'reuse'
-    const { sample, inferenceMs } = await source.process(frame, tMs, hands)
+    const { sample, inferenceMs } = await src.process(frame, tMs, hands)
+    if (!running) return null
     samples.push(sample)
     if (samples.length > t.maxSamples) samples.shift()
     o.onSample?.(sample)
@@ -102,7 +107,8 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
 
   async function pickTier(): Promise<PoseTier> {
     for (const [candidate, limit] of TIER_LIMITS) {
-      await source!.init({ tier: candidate, enableHands: o.enableHands })
+      if (!running || !source) return 'lite'
+      await source.init({ tier: candidate, enableHands: o.enableHands })
       tier = candidate
       const times: number[] = []
       for (let attempts = 0; running && times.length < BENCHMARK_FRAMES && attempts < BENCHMARK_FRAMES * 5; attempts++) {
@@ -112,7 +118,8 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
       }
       if (times.length > 0 && p95(times) < limit) return candidate
     }
-    await source!.init({ tier: 'lite', enableHands: o.enableHands })
+    if (!running || !source) return 'lite'
+    await source.init({ tier: 'lite', enableHands: o.enableHands })
     return 'lite'
   }
 
@@ -148,6 +155,7 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
         console.error('vision: frame failed', err)
         return goOff('model_failed')
       }
+      if (!running) return
       if (ms !== null) {
         recent.push(ms)
         if (recent.length >= pacing.fps) {
@@ -172,11 +180,19 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
     }
   }
 
-  async function stop(): Promise<VisualSummary> {
+  const onAbort = () => {
+    stop().catch((err) => console.error('vision: stop on abort failed', err))
+  }
+
+  function stop(): Promise<VisualSummary> {
+    return (stopping ??= doStop())
+  }
+
+  async function doStop(): Promise<VisualSummary> {
     running = false
+    o.signal?.removeEventListener('abort', onAbort)
     source?.dispose()
     source = null
-    await loop
     if (status !== 'off') status = 'stopped'
     const { qualified, observations: finalObs } = detect()
     observations = finalObs
@@ -193,11 +209,17 @@ export function createVisionSession(o: VisionSessionOptions): VisionSession {
 
   return {
     async start() {
-      if (loop) throw new Error('vision session already started')
+      if (stopping) throw new Error('vision session already stopped')
+      if (started) throw new Error('vision session already started')
+      started = true
+      if (o.signal?.aborted) {
+        await stop()
+        return
+      }
       running = true
       emit()
-      o.signal?.addEventListener('abort', () => void stop(), { once: true })
-      loop = run()
+      o.signal?.addEventListener('abort', onAbort, { once: true })
+      void run()
     },
     stop,
     getSamples: () => [...samples],
