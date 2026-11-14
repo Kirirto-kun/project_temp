@@ -1,0 +1,10 @@
+services:
+  intake:
+    build: .
+    image: holdline-intake:local
+    restart: unless-stopped
+    init: true
+    env_file: .env.production.local
+    ports:
+      - "127.0.0.1:3000:3000"
+    stop_grace_period: 20s

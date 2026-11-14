@@ -1,0 +1,10 @@
+.git
+.next
+node_modules
+.env*
+services
+.superpowers
+test-results
+playwright-report
+coverage
+*.tsbuildinfo

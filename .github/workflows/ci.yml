@@ -1,0 +1,32 @@
+name: Intake service
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.12-alpine
+        env:
+          POSTGRES_USER: holdline
+          POSTGRES_PASSWORD: ci-only-intake
+          POSTGRES_DB: holdline_test
+        ports: ['54329:5432']
+        options: --health-cmd 'pg_isready -U holdline' --health-interval 2s --health-timeout 3s --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run setup:local
+      - name: Configure ephemeral CI database
+        run: |
+          node --input-type=module -e "import fs from 'node:fs'; let s=fs.readFileSync('.env.local','utf8'); s=s.replace(/^DATABASE_URL=.*$/m,'DATABASE_URL=postgresql://holdline:ci-only-intake@127.0.0.1:54329/holdline_test').replace(/^TEST_DATABASE_URL=.*$/m,'TEST_DATABASE_URL=postgresql://holdline:ci-only-intake@127.0.0.1:54329/holdline_test'); fs.writeFileSync('.env.local',s);"
+      - run: npm run db:migrate
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
