@@ -4,8 +4,8 @@ import type { Face } from './types'
 export type Vec = { x: number; y: number }
 export type Box = { x0: number; y0: number; x1: number; y1: number }
 
-/** Flip to -1 if the Task 14 calibration shows that looking down gives a positive pitch. */
-export const PITCH_SIGN = 1
+/** Calibrated 2026-11-15 on the demo webcam: raw pitch rises when looking down, so flip it (down = negative). */
+export const PITCH_SIGN = -1
 /** Flip to -1 if the Task 14 calibration shows iris offset and head yaw disagree in sign. */
 export const GAZE_H_SIGN = 1
 

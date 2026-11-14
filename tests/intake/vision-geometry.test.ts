@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { gazeOnScreen, headAngles, inBox, irisOffset } from '@/onboarding/client/vision/geometry'
+import { PITCH_SIGN, gazeOnScreen, headAngles, inBox, irisOffset } from '@/onboarding/client/vision/geometry'
 import { median, p95 } from '@/onboarding/client/vision/stats'
 import { THRESHOLDS } from '@/onboarding/client/vision/thresholds'
 import { baseSample } from './vision-fixtures'
@@ -18,7 +18,7 @@ describe('headAngles', () => {
   it('reads pitch from a rotation about X', () => {
     const c = Math.cos(rad(-20)), s = Math.sin(rad(-20))
     const a = headAngles(colMajor([[1, 0, 0], [0, c, -s], [0, s, c]]))
-    expect(a.pitchDeg).toBeCloseTo(-20, 5)
+    expect(a.pitchDeg).toBeCloseTo(-20 * PITCH_SIGN, 5)
     expect(a.yawDeg).toBeCloseTo(0, 5)
   })
 })
