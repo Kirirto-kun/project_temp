@@ -23,7 +23,11 @@ export const PoseSchema = z.strictObject({
 
 export const HandSchema = z.strictObject({ center: VecSchema, openPalm: z.boolean() })
 
-/** One analysed frame. `hands` is null when hand tracking did not run for this frame. */
+/**
+ * One analysed frame. `hands` is null when hand tracking did not run for this frame.
+ * `handsFresh` is true iff `hands` came from a hand-landmarker detection on this very frame
+ * (false when reused from an earlier frame, and whenever `hands` is null).
+ */
 export const LandmarkSampleSchema = z.strictObject({
   tMs: z.number().nonnegative(),
   luma: z.number().min(0).max(255),
@@ -32,6 +36,7 @@ export const LandmarkSampleSchema = z.strictObject({
   face: FaceSchema.nullable(),
   pose: PoseSchema.nullable(),
   hands: z.array(HandSchema).max(2).nullable(),
+  handsFresh: z.boolean(),
 })
 
 export const EVENT_KINDS = [

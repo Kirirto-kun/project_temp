@@ -26,7 +26,8 @@ export function detectHands(q: readonly Qualified[], t: Thresholds, ctx: Ctx, ha
   })
   const openPalm = whenValid((x) => (x.s.hands && x.s.hands.length > 0 ? x.s.hands.some((h) => h.openPalm) : null))
 
-  const palm = handsEnabled
+  // Hands were requested but no frame ever ran the hand landmarker (e.g. pacing switched it off).
+  const palm = handsEnabled && q.some((x) => x.s.hands)
     ? shareMetric(ctx, 'open_palm_share', q, openPalm, t, 'limbs_not_visible')
     : metricObservation(ctx, 'open_palm_share', windowOf(q), null, 'ratio', 0, coverage(q).observedMs, 'hands_disabled')
 
@@ -38,26 +39,48 @@ export function detectHands(q: readonly Qualified[], t: Thresholds, ctx: Ctx, ha
   ]
 }
 
-/** Bursts of fast hand movement per minute of hands-visible time. */
+/**
+ * Bursts of fast hand movement per minute of hands-visible time.
+ * Hand-landmarker positions are only comparable between frames where the landmarker really ran
+ * (reused frames repeat the previous result), so speed is measured between consecutive fresh frames.
+ * Pose-wrist fallback (no hand-landmarker data) uses every frame.
+ */
 function gestureActivity(q: readonly Qualified[], t: Thresholds, ctx: Ctx): Observation {
   let visibleMs = 0
   const bursts: Run[] = []
   let cur: Run | null = null
+  let lastFresh: { tMs: number; pts: Vec[] } | null = null
+  // Fresh frames are normally every other frame, so allow twice the usual gap between them.
+  const maxFreshGapMs = t.maxSampleGapMs * 2
   q.forEach((b, i) => {
     const pb = b.valid ? handPoints(b.s, t) : null
-    if (!pb || pb.length === 0) return
+    if (!pb || pb.length === 0) {
+      lastFresh = null
+      return
+    }
     visibleMs += b.durMs
-    const a = q[i - 1]
-    const pa = a?.valid ? handPoints(a.s, t) : null
-    if (!a || !pa || pa.length !== pb.length) return
-    const dt = (b.s.tMs - a.s.tMs) / 1000
-    if (dt <= 0 || dt * 1000 > t.maxSampleGapMs) return
-    const speed = Math.max(...pb.map((p) => Math.min(...pa.map((o) => dist(p, o))))) / dt
+    let from: { tMs: number; pts: Vec[] } | null = null
+    let maxGapMs = t.maxSampleGapMs
+    if (b.s.hands) {
+      if (!b.s.handsFresh) return
+      from = lastFresh
+      maxGapMs = maxFreshGapMs
+      lastFresh = { tMs: b.s.tMs, pts: pb }
+    } else {
+      lastFresh = null
+      const a = q[i - 1]
+      const pa = a?.valid && !a.s.hands ? handPoints(a.s, t) : null
+      if (a && pa) from = { tMs: a.s.tMs, pts: pa }
+    }
+    if (!from || from.pts.length !== pb.length) return
+    const dtMs = b.s.tMs - from.tMs
+    if (dtMs <= 0 || dtMs > maxGapMs) return
+    const speed = Math.max(...pb.map((p) => Math.min(...from.pts.map((o) => dist(p, o))))) / (dtMs / 1000)
     if (speed <= t.gestureSpeed) return
-    if (cur && a.s.tMs - cur.endMs <= t.gestureGapMs) cur.endMs = b.s.tMs
+    if (cur && from.tMs - cur.endMs <= t.gestureGapMs) cur.endMs = b.s.tMs
     else {
       if (cur) bursts.push(cur)
-      cur = { startMs: a.s.tMs, endMs: b.s.tMs }
+      cur = { startMs: from.tMs, endMs: b.s.tMs }
     }
   })
   if (cur) bursts.push(cur)

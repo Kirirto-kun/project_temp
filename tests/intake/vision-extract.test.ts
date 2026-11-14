@@ -33,6 +33,7 @@ function frame(): RawFrame {
         { categoryName: 'eyeBlinkLeft', score: 0.9, index: 2, displayName: '' },
       ], headIndex: 0, headName: '' }],
     },
+    handsFresh: true,
     hands: { landmarks: [openRightHand().map((p) => lm(p.x, p.y))], handedness: [[{ categoryName: 'Left', score: 0.9, index: 0, displayName: '' }]] },
   }
 }
@@ -48,12 +49,18 @@ describe('toSample', () => {
     expect(s.face!.yawDeg).toBeCloseTo(0, 6)
     expect(s.hands).toHaveLength(1)
     expect(s.hands![0]!.openPalm).toBe(true)
+    expect(s.handsFresh).toBe(true)
+  })
+
+  it('marks reused hands as not fresh, and absent hands never fresh', () => {
+    expect(toSample({ ...frame(), handsFresh: false }).handsFresh).toBe(false)
+    expect(toSample({ ...frame(), hands: null, handsFresh: true })).toMatchObject({ hands: null, handsFresh: false })
   })
 
   it('reports absent detections as null and counts people', () => {
     const f = frame()
     const s = toSample({ ...f, pose: { landmarks: [] }, face: { ...f.face, faceLandmarks: [] }, hands: null })
-    expect(s).toMatchObject({ pose: null, face: null, hands: null, faces: 0, poses: 0 })
+    expect(s).toMatchObject({ pose: null, face: null, hands: null, handsFresh: false, faces: 0, poses: 0 })
   })
 })
 

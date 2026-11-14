@@ -47,4 +47,30 @@ describe('detectHands', () => {
     }), T), T, ctx, true)
     expect(of(obs, 'gesture_activity')[0]!.value).toBeCloseTo(12, 0)
   })
+
+  describe('gesture speed with reused hand frames', () => {
+    // constant motion of `speed` frame widths per second; with `reuse`, every other frame repeats the previous position
+    const gestures = (speed: number, reuse: boolean) => {
+      const q = qualify(timeline(0, 30000, 100, (s) => {
+        const tPos = reuse ? Math.floor(s.tMs / 200) * 200 : s.tMs
+        return withHands(s, [hand(0.1 + (tPos / 1000) * speed, 0.45)], s.tMs === tPos)
+      }), T)
+      return of(detectHands(q, T, ctx, true), 'gesture_activity')[0]!.value
+    }
+
+    it('counts the same bursts as all-fresh frames at 0.5 widths/s', () => {
+      expect(gestures(0.5, false)).toBeGreaterThan(0)
+      expect(gestures(0.5, true)).toBeCloseTo(gestures(0.5, false)!, 0)
+    })
+
+    it('does not turn slow motion into a gesture by doubling the speed on the next fresh frame', () => {
+      expect(gestures(0.15, false)).toBe(0)
+      expect(gestures(0.15, true)).toBe(0)
+    })
+  })
+
+  it('reports hands_disabled for open palms when hands were enabled but no frame ran the hand landmarker', () => {
+    const obs = detectHands(qualify(timeline(0, 15000, 100, (s) => withHands(s, null)), T), T, ctx, true)
+    expect(of(obs, 'open_palm_share')[0]).toMatchObject({ value: null, unavailableReason: 'hands_disabled' })
+  })
 })

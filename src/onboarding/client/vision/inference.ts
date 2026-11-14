@@ -84,13 +84,15 @@ export async function createInference(o: InferenceOptions): Promise<Inference> {
         try {
           const faceRes = face.detectForVideo(frame, tMs)
           let handsRes: HandLandmarkerResult | null = null
+          let handsFresh = false
           if (hand && handsMode !== 'off') {
             if (handsMode === 'run' || !lastHands || tMs - lastHands.tMs > HAND_REUSE_MS) {
               lastHands = { tMs, result: hand.detectForVideo(frame, tMs) }
+              handsFresh = true
             }
             handsRes = lastHands.result
           }
-          return toSample({ tMs, frameW: frame.width, frameH: frame.height, luma: luma(frame), pose: poseRes, face: faceRes, hands: handsRes })
+          return toSample({ tMs, frameW: frame.width, frameH: frame.height, luma: luma(frame), pose: poseRes, face: faceRes, hands: handsRes, handsFresh })
         } finally {
           poseRes.close()
         }

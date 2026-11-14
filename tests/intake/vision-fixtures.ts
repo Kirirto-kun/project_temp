@@ -20,6 +20,7 @@ export function baseSample(tMs: number): LandmarkSample {
       lElbow: pt(0.66, 0.5), rElbow: pt(0.34, 0.5), lWrist: pt(0.64, 0.6, 0.2), rWrist: pt(0.36, 0.6, 0.2),
     },
     hands: [],
+    handsFresh: true,
   }
 }
 
@@ -27,7 +28,7 @@ export const withFace = (s: LandmarkSample, f: Partial<Face>): LandmarkSample =>
 export const withBlend = (s: LandmarkSample, b: Partial<Face['blend']>): LandmarkSample =>
   s.face ? withFace(s, { blend: { ...s.face.blend, ...b } }) : s
 export const withPose = (s: LandmarkSample, p: Partial<Pose>): LandmarkSample => ({ ...s, pose: s.pose ? { ...s.pose, ...p } : null })
-export const withHands = (s: LandmarkSample, hands: Hand[] | null): LandmarkSample => ({ ...s, hands })
+export const withHands = (s: LandmarkSample, hands: Hand[] | null, handsFresh = hands !== null): LandmarkSample => ({ ...s, hands, handsFresh })
 
 /** Samples every `stepMs` in [fromMs, toMs). */
 export function timeline(fromMs: number, toMs: number, stepMs: number, patch: (s: LandmarkSample) => LandmarkSample = (s) => s): LandmarkSample[] {

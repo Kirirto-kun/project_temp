@@ -11,6 +11,8 @@ export type RawFrame = {
   pose: Pick<PoseLandmarkerResult, 'landmarks'>
   face: Pick<FaceLandmarkerResult, 'faceLandmarks' | 'facialTransformationMatrixes' | 'faceBlendshapes'>
   hands: Pick<HandLandmarkerResult, 'landmarks' | 'handedness'> | null
+  /** The hand landmarker ran on this frame (false when `hands` is a reused earlier result). */
+  handsFresh: boolean
 }
 
 const POSE_INDEX = { nose: 0, lShoulder: 11, rShoulder: 12, lElbow: 13, rElbow: 14, lWrist: 15, rWrist: 16 } as const
@@ -26,6 +28,7 @@ export function toSample(f: RawFrame): LandmarkSample {
     face: toFace(f.face, k),
     pose: toPose(f.pose, k),
     hands: f.hands ? toHands(f.hands, k) : null,
+    handsFresh: f.hands !== null && f.handsFresh,
   }
 }
 
