@@ -14,9 +14,10 @@ export function toolCall(type: string, data: Record<string, unknown>): { id: str
  * starts. The microphone starts muted; the caller unmutes once the attempt is confirmed current.
  */
 export const createAvatarSession: AvatarSessionFactory = async (token, callbacks) => {
-  const { ElevenLabsAgentSession, AgentEventsEnum, SessionEvent, VoiceChatState } = await import('@heygen/liveavatar-web-sdk');
+  const { ElevenLabsAgentSession, AgentEventsEnum, SessionEvent, SessionDisconnectReason, VoiceChatState } = await import('@heygen/liveavatar-web-sdk');
   const session = new ElevenLabsAgentSession(token, { autoKeepAlive: true, voiceChat: { defaultMuted: true } });
   let media: HTMLVideoElement | null = null;
+  let closing = false;
   session.on(AgentEventsEnum.USER_TRANSCRIPTION, (e) => callbacks.caption('user', e.text, e.event_id));
   session.on(AgentEventsEnum.AVATAR_TRANSCRIPTION, (e) => callbacks.caption('coach', e.text, e.event_id));
   session.on(AgentEventsEnum.AVATAR_SPEAK_STARTED, () => callbacks.speaking(true));
@@ -25,12 +26,17 @@ export const createAvatarSession: AvatarSessionFactory = async (token, callbacks
     const call = toolCall(e.elevenlabs_event_type, e.data);
     if (call) callbacks.tool(call.id, call.name, call.args);
   });
-  session.on(SessionEvent.SESSION_DISCONNECTED, () => callbacks.disconnected());
+  // The SDK also emits this for our own stop() and failed start(); only provider-side drops count.
+  session.on(SessionEvent.SESSION_DISCONNECTED, (reason) => {
+    if (closing || reason === SessionDisconnectReason.CLIENT_INITIATED || reason === SessionDisconnectReason.SESSION_START_FAILED) return;
+    callbacks.disconnected();
+  });
   return {
     async start() {
       await session.start();
       // The SDK can resolve start() after swallowing a microphone error; trust its public state.
       if (session.voiceChat.state !== VoiceChatState.ACTIVE) {
+        closing = true;
         session.voiceChat.stop();
         await session.stop().catch(() => undefined);
         throw new Error('The microphone did not start.');
@@ -45,6 +51,7 @@ export const createAvatarSession: AvatarSessionFactory = async (token, callbacks
       session.sendClientToolResult({ toolCallId: callId, result });
     },
     async stop() {
+      closing = true;
       session.voiceChat.stop();
       if (media) {
         media.pause();

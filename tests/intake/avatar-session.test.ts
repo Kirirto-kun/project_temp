@@ -28,13 +28,14 @@ vi.mock('@heygen/liveavatar-web-sdk', async () => {
       ELEVENLABS_AGENT_EVENT: 'elevenlabs_agent_event',
     },
     SessionEvent: { SESSION_DISCONNECTED: 'session.disconnected' },
+    SessionDisconnectReason: { CLIENT_INITIATED: 'CLIENT_INITIATED', SESSION_START_FAILED: 'SESSION_START_FAILED', SERVER_INITIATED: 'SERVER_INITIATED', UNKNOWN_REASON: 'UNKNOWN_REASON' },
     VoiceChatState: { ACTIVE: 'ACTIVE' },
   };
 });
 
 import { createAvatarSession, toolCall } from '@/onboarding/client/avatar-session';
 
-type Fake = EventEmitter & { config: unknown; voiceChat: { state: string; stop: ReturnType<typeof vi.fn>; unmute: ReturnType<typeof vi.fn> }; start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn>; sendClientToolResult: ReturnType<typeof vi.fn> };
+type Fake = EventEmitter & { config: unknown; voiceChat: { state: string; stop: ReturnType<typeof vi.fn>; mute: ReturnType<typeof vi.fn>; unmute: ReturnType<typeof vi.fn> }; start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn>; sendClientToolResult: ReturnType<typeof vi.fn> };
 const fake = () => sdk.last as unknown as Fake;
 
 function callbacks(): { [K in keyof AvatarSessionCallbacks]: Mock<AvatarSessionCallbacks[K]> } {
@@ -62,6 +63,30 @@ describe('avatar session wrapper', () => {
     expect(cb.caption.mock.calls).toEqual([['user', 'I make ninety-five', 'e1'], ['coach', 'Is that per year?', 'e2']]);
     expect(cb.speaking.mock.calls).toEqual([[true], [false]]);
     expect(cb.disconnected).toHaveBeenCalledOnce();
+  });
+
+  it('does not report SDK-originated disconnects as provider drops', async () => {
+    const cb = callbacks();
+    await createAvatarSession('tok', cb);
+    fake().emit('session.disconnected', 'CLIENT_INITIATED');
+    fake().emit('session.disconnected', 'SESSION_START_FAILED');
+    expect(cb.disconnected).not.toHaveBeenCalled();
+  });
+
+  it('ignores disconnects after the wrapper has been stopped', async () => {
+    const cb = callbacks();
+    const session = await createAvatarSession('tok', cb);
+    await session.stop();
+    fake().emit('session.disconnected', 'SERVER_INITIATED');
+    expect(cb.disconnected).not.toHaveBeenCalled();
+  });
+
+  it('maps setMuted to voice chat mute and unmute', async () => {
+    const session = await createAvatarSession('tok', callbacks());
+    session.setMuted(false);
+    expect(fake().voiceChat.unmute).toHaveBeenCalledOnce();
+    session.setMuted(true);
+    expect(fake().voiceChat.mute).toHaveBeenCalledOnce();
   });
 
   it('relays client tool calls and returns results', async () => {
