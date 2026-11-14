@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CoachMark } from '@/components/holdline/Avatar';
 import { formatClock, useCountdown } from '@/features/session/useCountdown';
 import type { IntakeView } from '../contracts';
-import { connectVideo, postTranscript, relayTool, stopIntake } from '../client/api';
+import { connectVideo, getIntake, postTranscript, relayTool, stopIntake } from '../client/api';
 import { AvatarCall, type AvatarCallState } from '../client/avatar-call';
 import { createAvatarSession } from '../client/avatar-session';
 import { Captions } from './TextCoach';
@@ -28,6 +28,12 @@ export function AvatarCoach({ view, onView, onFallback, onTypeInstead }: { view:
   useEffect(() => {
     if (left === 0 && state === 'active') void callRef.current?.end('timeout');
   }, [left, state]);
+
+  // If the stop request failed, the view may still show an open call; re-read it so the screen
+  // moves on to review instead of stopping at a disabled "Call ended".
+  useEffect(() => {
+    if (state === 'ended') void getIntake(view.id).then(onView, () => undefined);
+  }, [state, view.id, onView]);
 
   function start() {
     const call = new AvatarCall(
@@ -78,7 +84,7 @@ export function AvatarCoach({ view, onView, onFallback, onTypeInstead }: { view:
         </div>
         {state === 'idle' ? (
           <div className="grid gap-3">
-            <p className="m-0 text-[14px] leading-5 text-muted">Use headphones if you can. Your microphone goes to our video and speech providers so Alex can answer; your camera stays off. You can mute, skip or end at any time.</p>
+            <p className="m-0 text-[14px] leading-5 text-muted">Use headphones if you can. Your microphone goes to our video and speech providers so Alex can answer; your camera stays off. You can mute or end at any time.</p>
             <button type="button" className="btn btn-primary btn-xl" onClick={start}>
               Start the video call
             </button>
