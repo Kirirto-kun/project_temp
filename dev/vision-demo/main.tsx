@@ -156,7 +156,7 @@ function App() {
     if (down) l.speakingSince ??= performance.now() - l.t0
     else closeTurn(l, performance.now() - l.t0)
   }
-  const holdKey = (down: boolean) => (e: KeyboardEvent<HTMLButtonElement>) => {
+  const holdKey = (e: KeyboardEvent<HTMLButtonElement>, down: boolean) => {
     if (e.key !== ' ' && e.key !== 'Enter') return
     e.preventDefault()
     if (!e.repeat) speaking(down)
@@ -180,14 +180,14 @@ function App() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-6">
       <h1 className="font-display text-2xl font-bold">Body language: on-device demo</h1>
-      <p className="mt-1 text-sm text-muted">Frames are analysed in this browser. Only observations reach the mock endpoint; "Download clip" saves landmark timelines to your own disk for labelling.</p>
+      <p className="mt-1 text-sm text-muted">Frames are analysed in this browser. Only observations reach the mock endpoint; &ldquo;Download clip&rdquo; saves landmark timelines to your own disk for labelling.</p>
 
       <div className="mt-4 flex flex-wrap items-center gap-4">
         <label className="flex items-center gap-2"><input type="checkbox" checked={consent} onChange={(e) => { setConsent(e.target.checked); if (!e.target.checked) void withdrawConsent() }} /> Analyse my camera on this device</label>
         <label className="flex items-center gap-2"><input type="checkbox" checked={hands} onChange={(e) => setHands(e.target.checked)} /> Hand tracking</label>
         <button className={`${btn} bg-hold text-on-hold disabled:opacity-50`} disabled={!consent || phase !== 'idle'} onClick={start}>Start</button>
         <button className={`${btn} border border-line bg-raised disabled:opacity-50`} disabled={phase !== 'live'} onClick={stop}>Stop</button>
-        <button className={`${btn} border border-line bg-raised disabled:opacity-50`} disabled={phase !== 'live'} onPointerDown={() => speaking(true)} onPointerUp={() => speaking(false)} onPointerLeave={() => speaking(false)} onPointerCancel={() => speaking(false)} onKeyDown={holdKey(true)} onKeyUp={holdKey(false)} onBlur={() => speaking(false)}>Hold while speaking</button>
+        <button className={`${btn} border border-line bg-raised disabled:opacity-50`} disabled={phase !== 'live'} onPointerDown={() => speaking(true)} onPointerUp={() => speaking(false)} onPointerLeave={() => speaking(false)} onPointerCancel={() => speaking(false)} onKeyDown={(e) => holdKey(e, true)} onKeyUp={(e) => holdKey(e, false)} onBlur={() => speaking(false)}>Hold while speaking</button>
         <button className={`${btn} border border-line bg-raised disabled:opacity-50`} disabled={phase !== 'live' && !hasClip} onClick={download}>Download clip</button>
       </div>
       {error && <p className="mt-2 text-gap">{error}</p>}
