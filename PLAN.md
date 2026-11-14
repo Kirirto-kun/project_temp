@@ -1,7 +1,7 @@
 # Holdline — план разработки и первый созвон с AI-коучем
 
 Business Cup 2.0, Zimran × AIESEC × NU. 14–15 ноября 2026. Дедлайн сдачи **12:00, 15 ноября**.
-Рабочее название продукта: Holdline. Брендбук: [brandbook.html](brandbook.html). Контекст по хакатону: заметка `Zimran Business Cup 2.0` в базе знаний.
+Рабочее название продукта: Holdline. **Единый стек всех веток: [TECH_STACK.md](TECH_STACK.md), правила разработчиков: [AGENTS.md](AGENTS.md).** Брендбук: [brandbook.html](brandbook.html). Контекст по хакатону: заметка `Zimran Business Cup 2.0` в базе знаний.
 
 **Обновление 15 ноября 2026:** вместо первого опросника основной вход — разговор с видеоаватаром, который собирает профиль и помогает подготовить первую фразу. Старые сроки H+2…20 описывают исходный объём хакатона. Новый созвон — отдельная обязательная вертикаль с этапами G0…G3; его нельзя автоматически вместить в прежние 24 часа или считать готовым по наличию запасной формы.
 
@@ -66,42 +66,42 @@ Business Cup 2.0, Zimran × AIESEC × NU. 14–15 ноября 2026. Дедла�
 
 ## 4. Архитектура
 
-```
-Браузер (Next.js)
- ├─ Первый созвон, локальное self-view .... LiveKit + LiveAvatar; камера не публикуется
- ├─ Наблюдения за движением ............... MediaPipe Pose/Face в Web Worker, после согласия
- ├─ Запасная форма, каталог, разбор, план .. React + Tailwind + shadcn/ui
- ├─ Голосовая сессия ....................... @elevenlabs/client (Agent WebRTC/WS)
- ├─ Живые метрики .......................... Web Audio: RMS, паузы, F0 (pitchfinder)
- ├─ Запись пользователя .................... MediaRecorder → upload после сессии
- └─ localStorage ........................... только необязательная локальная очередь; не право оплаты/источник профиля
+**Действующее решение владельца — [TECH_STACK.md](TECH_STACK.md).** Весь наш runtime на TypeScript/Node.js; существующая PostgreSQL — единственное серверное хранилище. Собственный LiveKit и Python worker отменены.
 
-Сервер (Next.js API routes / Route Handlers)
- ├─ /api/intake/** ......................... профиль, согласия, connect/stop, наблюдения, подтверждение и handoff
- ├─ POST /api/session ...................... создать сессию, собрать ScenarioConfig (Сценарист)
- ├─ POST /api/llm/v1/chat/completions ...... custom LLM для ElevenLabs Agent:
- │     реплика → Классификатор → Ядро → Актёр → SSE-стрим текста
- ├─ POST /api/turn ......................... тот же пайплайн для текстового режима
- ├─ POST /api/voice/baseline ............... Scribe batch → VoiceBaseline
- ├─ POST /api/voice/analyze ................ Scribe batch по записи сессии → VoiceMetrics по ходам
- ├─ POST /api/debrief ...................... суммы кодом, комментарии LLM
- ├─ POST /api/elevenlabs/token ............. одноразовый токен для клиента
- ├─ POST /api/polar/webhook ................ оплата
- └─ Rate limit по IP + глобальный потолок расходов
+```text
+Браузер (Next.js + React + TypeScript)
+ ├─ Первый звонок ........ @heygen/liveavatar-web-sdk → LiveAvatar LITE
+ │                         → ElevenLabs Agent Connector → Agent «Коуч»
+ ├─ save_profile ......... client tool → наш API → PostgreSQL → результат коучу
+ ├─ Форма/каталог/разбор . Tailwind + shadcn/ui, общая структура QuizAnswers
+ ├─ Переговоры .......... @elevenlabs/client → Agent «Собеседник»
+ ├─ Аудио с согласием ... MediaRecorder → Scribe proxy → освободить запись
+ ├─ Поздние слои ........ MediaPipe / pitchfinder локально, opt-in + feature flags
+ └─ Камера .............. только локальное self-view, видео на сервер не уходит
 
-Хранилище
- ├─ Состояние: Redis/Upstash с атомарной версией и TTL; Map только для локальной разработки
- └─ Аудио: временно в объектном хранилище (S3/R2), удаление через 24 ч
+Next.js API / TypeScript jobs
+ ├─ /api/intake/** ................ owner-bound draft, connect/stop, tools, confirm
+ ├─ /api/session, /api/turn ....... состояние и транзакционные ходы
+ ├─ /api/llm/v1/chat/completions . custom LLM: классификатор → ядро → актёр → SSE
+ ├─ /api/voice/** ................ Scribe, transcript/timings/метрики в jsonb
+ ├─ /api/elevenlabs/token ........ scoped credentials для переговоров
+ ├─ /api/polar/** ................ checkout/webhook/серверные права
+ └─ PostgreSQL jobs ............. cleanup, дедлайны, квоты и бюджет
+
+PostgreSQL (существующая БД)
+ ├─ profiles: QuizAnswers/draft/revisions/confirmation
+ ├─ sessions + turns: snapshot, версии, дедупликация ходов
+ ├─ feature_flags, лимиты, budget reservations, задания
+ └─ transcript/timings/метрики: jsonb; raw audio по умолчанию не хранится
 
 Внешние сервисы
- ├─ LiveAvatar LITE + LiveKit Agents Python worker: видеослой и жизненный цикл первого звонка
- ├─ OpenAI Realtime API: диалог и tool calls для заполнения подтверждаемого профиля
- ├─ ElevenLabs: Agents (сессия), Scribe (STT с таймстемпами), TTS (голоса аватаров), IVC (клон, опционально)
- ├─ LLM: быстрая модель для Классификатора, обычная для Актёра/Сценариста/Разборщика
- └─ Polar: оплата
+ ├─ LiveAvatar LITE: иллюстрированный персонаж, managed room и connector
+ ├─ ElevenLabs: Agent «Коуч», Agent «Собеседник», Scribe
+ ├─ LLM через ModelPorts: выбранный поддерживаемый провайдер, включая Anthropic
+ └─ Polar
 ```
 
-Вводный Python worker разворачивается отдельно от Next.js handlers. Общие owner/auth, storage, бюджеты и задания предоставляет B. D управляет звонком и анализом, A — контрактами и денежными правилами, C — общим UI и захватом микрофона. Подробные технологии, источники, состояния и API — [план D](docs/superpowers/plans/2026-11-15-04-avatar-intake.md). Нативный коннектор LiveAvatar и альтернативы ElevenLabs/Tavus проверяются на G0; несколько говорящих агентов одновременно не запускаются.
+LiveAvatar обслуживает комнату и provider worker сам. Наличие LiveKit внутри Web SDK не требует нашей LiveKit-инфраструктуры или credentials. B предоставляет PostgreSQL/auth/budgets/jobs; D реализует connector, `save_profile`, call lifecycle и подтверждение; A сохраняет контракты и денежные правила; C — общий UI и capture. Ключи только на сервере. S3/R2/Redis/Python/OpenAI Realtime не являются зависимостями приложения. Подробнее — [план D](docs/superpowers/plans/2026-11-15-04-avatar-intake.md).
 
 ### 4.1 Движок: четыре агента вокруг детерминированного ядра
 
@@ -280,7 +280,7 @@ interface Debrief { leftOnTable: number; ceiling: number; stoppedAt: number; row
 - [ ] Хранилище аудио с TTL, хранилище состояния сессий
 - [ ] Polar: продукт, checkout, проверенный webhook и серверное право доступа
 - [ ] Клон голоса (слой 4)
-- [ ] Shared storage/queue/audio/budget для D, отдельный deployment Python worker, приёмка четырёх веток
+- [ ] PostgreSQL/auth/jobs/budget и Scribe proxy для D, LiveAvatar connector, приёмка четырёх веток
 
 ### C. Фронтенд
 - [ ] Токены из `brandbook.html` в Tailwind, shadcn перекрашен
@@ -295,12 +295,12 @@ interface Debrief { leftOnTable: number; ceiling: number; stoppedAt: number; row
 - [ ] Общий capture API для C/D, тексты/интервью/источники/демо и скриншоты для дека
 
 ### D. Первый созвон с аватаром
-- [ ] Проверить LiveAvatar + OpenAI Realtime + LiveKit: один голос, lip-sync, прерывания, инструменты и реальная стоимость
+- [ ] Проверить LiveAvatar LITE + ElevenLabs Agent Connector: один голос, lip-sync, save_profile/client tool result, прерывания и реальная стоимость
 - [ ] Продумать и реализовать приглашение, lobby, беседу, короткую пробу, review и передачу в тренажёр
 - [ ] Собирать профессию, зарплату/валюту/период/gross-net, цель, аргументы; исправления и подтверждения обязательны
 - [ ] Локальные MediaPipe Pose/Face, качество кадра и наблюдаемые движения; выключение камеры не блокирует продукт
 - [ ] Разбор речи с проверяемыми цитатами и максимум тремя полезными советами
-- [ ] API intake, Python worker, lifecycle, восстановление, очистка, fallback, тесты и пилот первого опыта
+- [ ] API intake и PostgreSQL, LiveAvatar Web SDK/connector, lifecycle, восстановление, cleanup job, fallback, тесты и пилот первого опыта
 - [ ] Пройти G0…G3 по [четвёртому плану](docs/superpowers/plans/2026-11-15-04-avatar-intake.md)
 
 ---
@@ -384,7 +384,7 @@ interface Debrief { leftOnTable: number; ceiling: number; stoppedAt: number; row
 3. Сколько минут Agents и Scribe дают кредиты ElevenLabs. Посчитать запас.
 4. Какую LLM берём для классификатора (нужна быстрая со структурированным выводом) и для актёра.
 5. Клон голоса: делаем или оставляем в roadmap. Решить после проверки качества в слое 2.
-6. Хостинг аудио: R2/S3 или вообще не хранить, а анализировать сразу и выбрасывать.
+6. Аудио не храним: анализируем через Scribe и освобождаем. Опциональное прослушивание через PostgreSQL bytea ≤24h — отдельная функция, по умолчанию выключена.
 
 ---
 
@@ -392,7 +392,7 @@ interface Debrief { leftOnTable: number; ceiling: number; stoppedAt: number; row
 
 **Смысл:** человек знакомится с коучем и готовит свою задачу. Нельзя сразу превращать это в стресс-интервью, скрытый экзамен или торг. Серьёзность достигается качеством лица/голоса, спокойным темпом, точным пониманием и полезным итогом.
 
-**Рекомендация для проверки G0:** LiveAvatar LITE для лица; OpenAI Realtime API для речи и tools; LiveKit Agents Python worker для управления; MediaPipe Pose + Face Landmarker локально для body language; Scribe v3 после звонка для raw-транскрипта. Сравнение с ElevenLabs Agent, нативными коннекторами и Tavus Raven-2, ссылки на первоисточники и ограничения — [план D §1–3](docs/superpowers/plans/2026-11-15-04-avatar-intake.md).
+**Принятый стек для G0:** LiveAvatar LITE + ElevenLabs Agent Connector, иллюстрированный/стилизованный коуч, client tool `save_profile` через наш API в существующую PostgreSQL. Переговорный Agent «Собеседник» использует прежний custom LLM pipeline. Scribe сохраняет transcript/timings в jsonb; raw audio освобождается. MediaPipe и pitchfinder — поздние локальные слои за флагами. Собственные LiveKit/Python/OpenAI Realtime/Redis/S3 отменены; [TECH_STACK.md](TECH_STACK.md) обязателен для всех веток.
 
 **Последовательность:** приглашение → выбор устройств/согласия → роль и разговор → текущие условия → желаемые условия → аргументы/неизвестные данные → 20–30 секунд пробного запроса → проверка карточки → brief и ≤3 подтверждённых совета → тренировка. На review платная медиасессия закрывается; чтение и исправления не тарифицируются как продолжающийся звонок.
 
