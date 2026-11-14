@@ -2,12 +2,18 @@ import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { LabelledClipSchema, scoreClips } from '../src/onboarding/client/vision/eval'
 
-const dir = process.argv[2]
+const args = process.argv.slice(2)
+const dir = args.find((a) => !a.startsWith('--'))
 if (!dir) throw new Error('usage: npm run vision:eval -- <folder of labelled clip .json files, kept outside git>')
 const handsEnabled = !process.argv.includes('--no-hands')
 
 const files = (await readdir(dir)).filter((f) => f.endsWith('.json'))
-const clips = await Promise.all(files.map(async (f) => LabelledClipSchema.parse(JSON.parse(await readFile(path.join(dir, f), 'utf8')))))
+if (files.length === 0) throw new Error(`no clips: ${dir} contains no .json files`)
+const clips = await Promise.all(files.map(async (f) => {
+  const parsed = LabelledClipSchema.safeParse(JSON.parse(await readFile(path.join(dir, f), 'utf8')))
+  if (!parsed.success) throw new Error(`${f}: ${parsed.error.message}`)
+  return parsed.data
+}))
 const scores = scoreClips(clips, { handsEnabled })
 const fmt = (v: number | null) => (v === null ? '   –' : v.toFixed(2))
 
