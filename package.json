@@ -21,6 +21,7 @@
     "test:classifier:live": "tsx scripts/evaluate-classifier.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
     "@elevenlabs/client": "1.36.1",
     "@elevenlabs/react": "1.22.1",
     "clsx": "2.1.1",

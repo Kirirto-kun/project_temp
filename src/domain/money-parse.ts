@@ -42,7 +42,7 @@ const NON_MONEY_UNITS = new Set([
   'time', 'members', 'member', 'team', 'teams', 'users', 'user', 'tickets', 'releases', 'release',
   'features', 'feature', 'sprints', 'sprint', 'deals', 'deal', 'accounts', 'account', 'stars', 'points',
   'apps', 'services', 'products', 'percent', 'per', 'x', 'pm', 'am', 'st', 'nd', 'rd', 'th', 'kids',
-  'children', 'rooms', 'bedroom', 'bedrooms', 'floors', 'offers', 'interviews', 'companies', 'jobs',
+  'children', 'rsu', 'rsus', 'shares', 'share', 'options', 'units', 'unit', 'stocks', 'rooms', 'bedroom', 'bedrooms', 'floors', 'offers', 'interviews', 'companies', 'jobs',
   'languages', 'certifications', 'promotions', 'questions', 'things', 'reasons', 'options', 'steps',
 ]);
 const YEAR_PREFIXES = new Set(['in', 'since', 'by', 'from', 'until', 'til', 'till', 'of', 'year', 'back', 'during', 'before', 'after', 'early', 'late', 'mid', 'q1', 'q2', 'q3', 'q4']);
@@ -67,7 +67,7 @@ interface Token {
 
 function tokenize(text: string): Token[] {
   const tokens: Token[] = [];
-  const re = /[$€£₸¥₹]|\d[\d,]*(?:\.\d+)?|[A-Za-z]+(?:'[A-Za-z]+)?|%|-|–|—/g;
+  const re = /[$€£₸¥₹]|\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|[A-Za-z]+(?:'[A-Za-z]+)?|%|-|–|—/g;
   let match: RegExpExecArray | null;
   while ((match = re.exec(text))) {
     tokens.push({ text: match[0], lower: match[0].toLowerCase(), start: match.index, end: match.index + match[0].length });
