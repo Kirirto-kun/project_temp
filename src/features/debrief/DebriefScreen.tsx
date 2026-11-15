@@ -9,7 +9,7 @@ import type { Debrief } from '@/contracts/voice';
 import { formatMoney } from '@/domain/money';
 import { ApiClientError } from '@/client/api/client';
 import { getConfig, getDebrief, replay } from '@/client/api/session';
-import { recordResult } from '@/client/storage/plan';
+import { addDebriefToPlan, recordResult } from '@/client/storage/plan';
 import { ScreenSkeleton } from '@/components/ui/skeleton';
 import { DebriefReport } from './DebriefReport';
 
@@ -125,7 +125,7 @@ export function DebriefScreen({ sessionId }: { sessionId: string }) {
                 {replaying ? <Loader2 size={18} className="animate-spin" aria-hidden /> : <RotateCcw size={18} strokeWidth={2} aria-hidden />}
                 {replaying ? 'Starting…' : 'Replay this round'}
               </button>
-              <Link href="/plan" className="btn hero-ghost">
+              <Link href="/plan" className="btn hero-ghost" onClick={() => addDebriefToPlan(debrief)}>
                 Add to my plan
               </Link>
             </div>
