@@ -320,7 +320,7 @@ export const ConfirmRequestSchema = z.object({
 export async function confirmProfile(deps: PlatformDeps, ownerId: string, id: string, expectedRevision: number, confirmed: ProfileKey[]): Promise<IntakeView> {
   const store = intakeStore(deps);
   const before = await store.readOwned(id, ownerId);
-  if (before.mediaStatus === 'active' || before.mediaStatus === 'connecting') await stopMedia(deps, ownerId, id, 'confirm');
+  if (before.mediaStatus === 'active' || before.mediaStatus === 'connecting' || before.mediaStatus === 'stopping') await stopMedia(deps, ownerId, id, 'confirm');
   const { session, written } = await store.update(id, (s) => {
     if (s.revision !== expectedRevision && s.revision !== expectedRevision + 1) return null;
     const profile = confirmFields(s.profile, confirmed);
@@ -378,7 +378,9 @@ export async function stopMedia(deps: PlatformDeps, ownerId: string, id: string,
       return s.phase === 'interviewing' || s.phase === 'mini_practice' || s.phase === 'lobby' || s.phase === 'connecting' ? { ...s, phase: reason === 'end' ? 'review' : s.phase } : null;
     }
     settled = s;
-    const phase = s.phase === 'completed' ? s.phase : s.phase === 'connecting' || s.phase === 'lobby' ? 'interrupted' : 'review';
+    // A video call that fails after minting is already 'interviewing'; it continues with the next coach, not review.
+    const failedVideo = s.mode === 'video' && reason === 'fallback';
+    const phase = s.phase === 'completed' ? s.phase : failedVideo || s.phase === 'connecting' || s.phase === 'lobby' ? 'interrupted' : 'review';
     return { ...s, mediaStatus: 'closed', providerEpoch: s.providerEpoch + 1, phase, budgetReservation: null, providerSessionId: null };
   });
   const closed = settled as IntakeSession | null;
@@ -476,7 +478,8 @@ export async function connectVideo(deps: PlatformDeps, ownerId: string, ipHash: 
   const deadlineMs = attempt.resuming && attempt.current.deadlineAt ? new Date(attempt.current.deadlineAt).getTime() : attempt.now.getTime() + MEDIA_LIMIT_MS;
   let token;
   try {
-    token = await liveAvatar.mintToken({ maxSeconds: (deadlineMs - attempt.now.getTime()) / 1_000 });
+    // Five seconds short of the deadline, so the local countdown ends the call before LiveAvatar cuts it off.
+    token = await liveAvatar.mintToken({ maxSeconds: (deadlineMs - attempt.now.getTime()) / 1_000 - 5 });
   } catch {
     await abandonMediaAttempt(deps, ipHash, attempt);
     throw new ApiError('UPSTREAM_UNAVAILABLE', 'The video call could not start. Your answers are kept.', {}, 10);

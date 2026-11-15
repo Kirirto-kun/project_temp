@@ -2,9 +2,9 @@
 import type { AvatarSessionFactory } from './avatar-call';
 
 /** ElevenLabs client_tool_call payloads arrive either wrapped in `client_tool_call` or flat. */
-export function toolCall(type: string, data: Record<string, unknown>): { id: string; name: string; args: string } | null {
+export function toolCall(type: string, data: Record<string, unknown> | undefined): { id: string; name: string; args: string } | null {
   if (type !== 'client_tool_call') return null;
-  const raw = (data.client_tool_call ?? data) as Record<string, unknown>;
+  const raw = (data?.client_tool_call ?? data ?? {}) as Record<string, unknown>;
   if (typeof raw.tool_call_id !== 'string' || typeof raw.tool_name !== 'string') return null;
   return { id: raw.tool_call_id, name: raw.tool_name, args: JSON.stringify(raw.parameters ?? {}) };
 }
@@ -25,6 +25,11 @@ export const createAvatarSession: AvatarSessionFactory = async (token, callbacks
   session.on(AgentEventsEnum.ELEVENLABS_AGENT_EVENT, (e) => {
     const call = toolCall(e.elevenlabs_event_type, e.data);
     if (call) callbacks.tool(call.id, call.name, call.args);
+    else if (process.env.NODE_ENV !== 'production') console.debug('avatar: elevenlabs event', e.elevenlabs_event_type);
+  });
+  // attach() is a no-op until the remote tracks exist; attach again once they arrive.
+  session.on(SessionEvent.SESSION_STREAM_READY, () => {
+    if (media && !closing) session.attach(media);
   });
   // The SDK also emits this for our own stop() and failed start(); only provider-side drops count.
   session.on(SessionEvent.SESSION_DISCONNECTED, (reason) => {

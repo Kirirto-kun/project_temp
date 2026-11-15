@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { COST_ESTIMATES } from '@/server/limits/budget';
 import type { LiveAvatarClient } from '@/onboarding/server/liveavatar';
-import { connectVideo, createIntake, deleteIntake, intakeStore, stopMedia } from '@/onboarding/server/service';
+import { confirmProfile, connectVideo, createIntake, deleteIntake, handleTool, intakeStore, postMessage, stopMedia } from '@/onboarding/server/service';
 import { ALL_ON, IP, OWNER, makeDeps } from '../server/helpers';
 
 function fakeLiveAvatar(): LiveAvatarClient & { mintToken: ReturnType<typeof vi.fn>; stopSession: ReturnType<typeof vi.fn> } {
@@ -28,7 +28,7 @@ describe('video call', () => {
   it('mints a token for the remaining minutes, holds the avatar budget, and never exposes provider ids', async () => {
     const { deps, liveAvatar, v } = await videoIntake();
     const result = await connectVideo(deps, OWNER, IP, v.id, v.revision);
-    expect(liveAvatar.mintToken).toHaveBeenCalledWith({ maxSeconds: 300 });
+    expect(liveAvatar.mintToken).toHaveBeenCalledWith({ maxSeconds: 295 });
     expect(result).toMatchObject({ sessionToken: 'token-1', providerEpoch: 1 });
     expect(result.intake).toMatchObject({ mode: 'video', mediaStatus: 'connecting', phase: 'interviewing' });
     expect(JSON.stringify(result.intake)).not.toMatch(/sess-1|token-1/);
@@ -100,7 +100,7 @@ describe('video call', () => {
     deps.clock.now += 60_000;
     const second = await connectVideo(deps, OWNER, IP, v.id, first.intake.revision);
     expect(liveAvatar.stopSession).toHaveBeenCalledWith('sess-1');
-    expect(liveAvatar.mintToken).toHaveBeenLastCalledWith({ maxSeconds: 240 });
+    expect(liveAvatar.mintToken).toHaveBeenLastCalledWith({ maxSeconds: 235 });
     expect(second.providerEpoch).toBe(2);
     expect(await deps.budget.spentToday()).toBe(5 * COST_ESTIMATES.avatarPerMinute);
   });
@@ -111,5 +111,27 @@ describe('video call', () => {
     const { deps, v } = await videoIntake(liveAvatar);
     await connectVideo(deps, OWNER, IP, v.id, v.revision);
     await expect(stopMedia(deps, OWNER, v.id, 'end')).resolves.toMatchObject({ mediaStatus: 'closed' });
+  });
+
+  it('a video call that fails after minting falls back to the next coach, not review', async () => {
+    const { deps, liveAvatar, v } = await videoIntake();
+    await connectVideo(deps, OWNER, IP, v.id, v.revision);
+    const stopped = await stopMedia(deps, OWNER, v.id, 'fallback');
+    expect(stopped).toMatchObject({ mediaStatus: 'closed', phase: 'interrupted' });
+    expect(liveAvatar.stopSession).toHaveBeenCalledWith('sess-1');
+    const next = await postMessage(deps, OWNER, IP, v.id, { turnId: 'turn-after-fallback-01', text: 'I want a raise' });
+    expect(next.committedTranscript.some((t) => t.text === 'I want a raise')).toBe(true);
+  });
+
+  it('confirming after Alex asked to end still stops the provider session and settles the hold', async () => {
+    const { deps, liveAvatar, v } = await videoIntake();
+    const connected = await connectVideo(deps, OWNER, IP, v.id, v.revision);
+    await handleTool(deps, OWNER, v.id, { providerEpoch: connected.providerEpoch, callId: 'call-end-1', name: 'request_end', arguments: '{}' });
+    const before = await intakeStore(deps).read(v.id);
+    expect(before?.mediaStatus).toBe('stopping');
+    deps.clock.now += 60_000;
+    await confirmProfile(deps, OWNER, v.id, before!.revision, []);
+    expect(liveAvatar.stopSession).toHaveBeenCalledWith('sess-1');
+    expect(await deps.budget.spentToday()).toBe(COST_ESTIMATES.avatarPerMinute);
   });
 });

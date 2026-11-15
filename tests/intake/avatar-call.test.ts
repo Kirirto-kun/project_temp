@@ -88,6 +88,20 @@ describe('AvatarCall', () => {
     expect(JSON.parse(session.sendToolResult.mock.calls[1]![1] as string)).toMatchObject({ ok: false });
   });
 
+  it('logs a failed tool relay for live debugging', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { call, api, callbacks } = setup();
+      await call.start();
+      api.tool.mockRejectedValueOnce(new Error('network'));
+      callbacks().tool('c1', 'get_missing_fields', '{}');
+      await flush();
+      expect(warn).toHaveBeenCalledWith('avatar call: tool relay failed', expect.any(Error));
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   describe('with fake timers', () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());

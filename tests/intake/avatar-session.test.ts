@@ -27,7 +27,7 @@ vi.mock('@heygen/liveavatar-web-sdk', async () => {
       AVATAR_SPEAK_ENDED: 'avatar.speak_ended',
       ELEVENLABS_AGENT_EVENT: 'elevenlabs_agent_event',
     },
-    SessionEvent: { SESSION_DISCONNECTED: 'session.disconnected' },
+    SessionEvent: { SESSION_DISCONNECTED: 'session.disconnected', SESSION_STREAM_READY: 'session.stream_ready' },
     SessionDisconnectReason: { CLIENT_INITIATED: 'CLIENT_INITIATED', SESSION_START_FAILED: 'SESSION_START_FAILED', SERVER_INITIATED: 'SERVER_INITIATED', UNKNOWN_REASON: 'UNKNOWN_REASON' },
     VoiceChatState: { ACTIVE: 'ACTIVE' },
   };
@@ -35,7 +35,7 @@ vi.mock('@heygen/liveavatar-web-sdk', async () => {
 
 import { createAvatarSession, toolCall } from '@/onboarding/client/avatar-session';
 
-type Fake = EventEmitter & { config: unknown; voiceChat: { state: string; stop: ReturnType<typeof vi.fn>; mute: ReturnType<typeof vi.fn>; unmute: ReturnType<typeof vi.fn> }; start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn>; sendClientToolResult: ReturnType<typeof vi.fn> };
+type Fake = EventEmitter & { config: unknown; attach: ReturnType<typeof vi.fn>; voiceChat: { state: string; stop: ReturnType<typeof vi.fn>; mute: ReturnType<typeof vi.fn>; unmute: ReturnType<typeof vi.fn> }; start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn>; sendClientToolResult: ReturnType<typeof vi.fn> };
 const fake = () => sdk.last as unknown as Fake;
 
 function callbacks(): { [K in keyof AvatarSessionCallbacks]: Mock<AvatarSessionCallbacks[K]> } {
@@ -99,12 +99,37 @@ describe('avatar session wrapper', () => {
     expect(fake().sendClientToolResult).toHaveBeenCalledWith({ toolCallId: 'c1', result: '{"ok":true}' });
   });
 
+  it('logs other ElevenLabs events outside production', async () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    try {
+      await createAvatarSession('tok', callbacks());
+      fake().emit('elevenlabs_agent_event', { elevenlabs_event_type: 'agent_response', data: {} });
+      fake().emit('elevenlabs_agent_event', { elevenlabs_event_type: 'client_tool_call', data: { tool_call_id: 'c1', tool_name: 'request_end' } });
+      expect(debug.mock.calls).toEqual([['avatar: elevenlabs event', 'agent_response']]);
+    } finally {
+      debug.mockRestore();
+    }
+  });
+
   it('fails the start when the microphone did not come on', async () => {
     const session = await createAvatarSession('tok', callbacks());
     fake().voiceChat.state = 'INACTIVE';
     await expect(session.start()).rejects.toThrow('microphone');
     expect(fake().voiceChat.stop).toHaveBeenCalled();
     expect(fake().stop).toHaveBeenCalled();
+  });
+
+  it('attaches the media element again once the stream is ready, but not after stop', async () => {
+    const session = await createAvatarSession('tok', callbacks());
+    const element = { pause: vi.fn(), srcObject: null } as unknown as HTMLVideoElement;
+    session.attach(element);
+    fake().attach.mockClear();
+    fake().emit('session.stream_ready');
+    expect(fake().attach).toHaveBeenCalledWith(element);
+    fake().attach.mockClear();
+    await session.stop();
+    fake().emit('session.stream_ready');
+    expect(fake().attach).not.toHaveBeenCalled();
   });
 
   it('stop releases the microphone before closing the session', async () => {
@@ -120,5 +145,6 @@ describe('toolCall', () => {
     expect(toolCall('client_tool_call', { client_tool_call: { tool_call_id: 'b', tool_name: 'request_end' } })).toEqual({ id: 'b', name: 'request_end', args: '{}' });
     expect(toolCall('client_tool_call', { tool_name: 'request_end' })).toBeNull();
     expect(toolCall('interruption', {})).toBeNull();
+    expect(toolCall('client_tool_call', undefined)).toBeNull();
   });
 });

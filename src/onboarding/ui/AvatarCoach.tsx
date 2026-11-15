@@ -36,6 +36,7 @@ export function AvatarCoach({ view, onView, onFallback, onTypeInstead }: { view:
   }, [state, view.id, onView]);
 
   function start() {
+    if (callRef.current) return;
     const call = new AvatarCall(
       {
         connect: () => connectVideo(view.id, view.revision),

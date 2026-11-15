@@ -44,9 +44,12 @@ export function IntakeScreen({ id }: { id: string }) {
   const reviewing = view.phase === 'review' || view.phase === 'completed';
   const coach = coachFor(view, fallback);
   const fallBack = (from: CoachKind, reason: string) => {
+    // Show the next coach only with the re-read intake, so it never starts from a stale revision.
+    const next = nextFallback(view, from);
     setNotice(reason);
-    setFallback(nextFallback(view, from));
-    void getIntake(id).then(setView);
+    void getIntake(id)
+      .then(setView)
+      .finally(() => setFallback(next));
   };
   return (
     <div className="grid gap-4">

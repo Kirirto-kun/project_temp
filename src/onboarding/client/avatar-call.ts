@@ -166,7 +166,8 @@ export class AvatarCall {
           let output: Record<string, unknown>;
           try {
             output = (await this.api.tool(this.epoch, callId, name, args)).output;
-          } catch {
+          } catch (error) {
+            console.warn('avatar call: tool relay failed', error);
             output = { ok: false, error: 'The server did not accept this call.' };
           }
           if (this.closed) return;
