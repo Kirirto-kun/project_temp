@@ -1,6 +1,6 @@
 import type { CoreState, Objective, ScenarioConfig, TurnRecord } from '@/contracts/domain';
 import type { DebriefRow, TurnVoice } from '@/contracts/voice';
-import { annualize, formatMoney, utility } from './money';
+import { annualize, formatMoney, isBetter, utility } from './money';
 
 export interface MoneyOutcome {
   agreedMinor: number | null;
@@ -140,8 +140,10 @@ export function templateBetterLine(config: ScenarioConfig, record: TurnRecord): 
       return `Before I move, help me understand what's blocking ${askText}. What would make it workable?`;
     case 'ultimatum':
       return `I'd like to find a number we can both stand behind. Here's why ${target} is fair for the role.`;
-    case 'accept':
-      return `Before we close, I'd like to revisit the number — ${target} reflects the scope I'm taking on.`;
+    case 'accept': {
+      const goal = record.after.agreedMinor !== null && !isBetter(config.objective, config.targetMinor, record.after.agreedMinor) ? config.reservationAmountMinor : config.targetMinor;
+      return `Before we close, I'd like to revisit the number — ${formatMoney(goal, config.period)} reflects the scope I'm taking on.`;
+    }
     case 'offtopic':
       return `Coming back to the number: I'm asking for ${askText}, and here's why.`;
     default:
