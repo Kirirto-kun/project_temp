@@ -4,8 +4,10 @@ const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'X-Frame-Options', value: 'DENY' },
-  // Microphone is requested only after an explicit user action; camera is never used.
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=()' },
+  // Same-origin only. The microphone and the camera (the optional on-device practice step in the coach review)
+  // are requested only after an explicit opt-in and click. Client-side navigation keeps the policy of the page
+  // where a visit started, so a per-route camera rule would never apply; third-party frames stay blocked.
+  { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=()' },
 ];
 
 const nextConfig: NextConfig = {

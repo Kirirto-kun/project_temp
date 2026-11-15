@@ -20,7 +20,7 @@ const cand = <T,>(value: T) => ({ value, status: 'candidate' as const, sourceTur
 function viewOf(profile: IntakeProfile, patch: Partial<IntakeView> = {}): IntakeView {
   return {
     id: 'int_test', revision: 9, profileRevision: 7, phase: 'review', mode: 'text', mediaStatus: 'not_started', publicProfile: profile, committedTranscript: [],
-    availability: { coachVoice: false, audioAnalysis: false }, consents: { audioAnalysis: false, visualAnalysis: false }, consentVersion: 1, missingFields: [], pendingQuestion: null,
+    availability: { coachVoice: false, avatarIntake: false, audioAnalysis: false }, consents: { audioAnalysis: false, visualAnalysis: false }, consentVersion: 1, missingFields: [], pendingQuestion: null,
     expiresAt: '2026-11-16T00:00:00.000Z', deadlineAt: null, inputMode: 'personal', assessmentStatus: null, handoff: null, supportedCurrency: true, ...patch,
   };
 }

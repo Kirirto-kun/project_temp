@@ -5,6 +5,7 @@ import { suggestPracticeRange } from '@/domain/intake-handoff';
 import { formatMoney } from '@/domain/money';
 import { callStructured } from '@/intelligence/structured';
 import { onlyAllowedAmounts } from '@/intelligence/money-guard';
+import { logEvent } from '@/server/observability';
 import { ApiError } from '@/server/http';
 import { newId } from '@/server/ids';
 import { COST_ESTIMATES } from '@/server/limits/budget';
@@ -74,7 +75,7 @@ function applyExtraction(session: IntakeSession, extraction: Extraction, sourceT
   };
 }
 
-export async function createIntake(deps: PlatformDeps, ownerId: string, input: { mode: 'text' | 'audio'; consents: Consents; consentVersion: number }): Promise<IntakeView> {
+export async function createIntake(deps: PlatformDeps, ownerId: string, input: { mode: 'text' | 'audio' | 'video'; consents: Consents; consentVersion: number }): Promise<IntakeView> {
   if (!deps.capabilities.coachIntake) throw new ApiError('FEATURE_DISABLED', 'The coach is not available. Use the quick form.');
   const now = deps.now().toISOString();
   const session: IntakeSession = {
@@ -82,7 +83,7 @@ export async function createIntake(deps: PlatformDeps, ownerId: string, input: {
     ownerId,
     revision: 1,
     profileRevision: 0,
-    phase: input.mode === 'audio' ? 'lobby' : 'interviewing',
+    phase: input.mode === 'text' ? 'interviewing' : 'lobby',
     profile: emptyProfile(),
     consentVersion: Math.max(1, input.consentVersion),
     consents: { audioAnalysis: input.consents.audioAnalysis && deps.capabilities.voiceAnalysis, visualAnalysis: false },
@@ -102,6 +103,7 @@ export async function createIntake(deps: PlatformDeps, ownerId: string, input: {
     handoff: null,
     toolCalls: [],
     budgetReservation: null,
+    providerSessionId: null,
   };
   await intakeStore(deps).create(session);
   return view(deps, session);
@@ -133,27 +135,32 @@ export async function postMessage(deps: PlatformDeps, ownerId: string, ipHash: s
   if (current.transcript.some((t) => t.turnId === input.turnId)) return view(deps, current);
   if (current.phase === 'completed' || current.phase === 'expired') throw new ApiError('INVALID_INPUT', 'This coach session is finished. Review your brief.');
   await deps.quota.consume('intake_message', ipHash, ownerId);
-  const interviewing = !(current.phase === 'mini_practice' || input.practice);
-  const ctxOf = (s: IntakeSession): ExtractContext => ({ asked: s.askedField as AskedField, profile: s.profile, pending: s.pending, lastMoneyField: lastMoneyField(s) });
-  const reading = interviewing ? await readWithModel(deps, input.text, ctxOf(current)) : null;
-  const { session } = await store.update(id, (s) => {
-    if (s.transcript.some((t) => t.turnId === input.turnId)) return null;
-    const seq = s.transcript.length + 1;
-    const userItem = item('user', input.text, seq, input.turnId);
-    if (s.phase === 'mini_practice' || input.practice) {
-      const next: IntakeSession = { ...s, transcript: [...s.transcript, userItem, item('coach', 'Thank you. Here is what I heard. Please check the numbers before we continue.', seq + 1)], practiceTurnId: input.turnId, phase: 'review' };
-      return { ...next, assessment: assessText(next, input.text) };
-    }
-    // The model reading is used only against the exact state it was made for; otherwise, or when
-    // it is missing or ungrounded, the deterministic extractor decides.
-    const fromModel = reading && s.revision === current.revision ? extractionFromModel(reading, input.text, ctxOf(s)) : null;
-    const extraction: Extraction = fromModel ?? extractFromUtterance(input.text, ctxOf(s));
-    const applied = applyExtraction({ ...s, transcript: [...s.transcript, userItem] }, extraction, input.turnId);
-    const reply = coachReply(applied.profile, extraction, seq, fromModel?.ack ?? null);
-    const phase = extraction.wantsEnd ? 'review' : reply.asked === 'mini_practice' && !extraction.clarification ? 'mini_practice' : 'interviewing';
-    return { ...applied, transcript: [...applied.transcript, item('coach', reply.text, seq + 1)], askedField: reply.asked, phase };
-  });
+  const practice = current.phase === 'mini_practice' || Boolean(input.practice);
+  const reading = practice ? null : await readWithModel(deps, input.text, extractContext(current));
+  const { session } = await store.update(id, (s) => (s.transcript.some((t) => t.turnId === input.turnId) ? null : coachTurn(s, input.text, input.turnId, Boolean(input.practice), reading, current.revision)));
   return view(deps, session);
+}
+
+const extractContext = (s: IntakeSession): ExtractContext => ({ asked: s.askedField as AskedField, profile: s.profile, pending: s.pending, lastMoneyField: lastMoneyField(s) });
+
+/**
+ * One answer through the coach: extraction, profile update and Alex's next line. A model reading
+ * is used only against the exact state it was made for (`readAt`); otherwise, or when it is
+ * missing or ungrounded, the deterministic extractor decides.
+ */
+function coachTurn(s: IntakeSession, text: string, turnId: string, practice: boolean, reading: Awaited<ReturnType<typeof readWithModel>> | null, readAt: number): IntakeSession {
+  const seq = s.transcript.length + 1;
+  const userItem = item('user', text, seq, turnId);
+  if (s.phase === 'mini_practice' || practice) {
+    const next: IntakeSession = { ...s, transcript: [...s.transcript, userItem, item('coach', 'Thank you. Here is what I heard. Please check the numbers before we continue.', seq + 1)], practiceTurnId: turnId, phase: 'review' };
+    return { ...next, assessment: assessText(next, text) };
+  }
+  const fromModel = reading && s.revision === readAt ? extractionFromModel(reading, text, extractContext(s)) : null;
+  const extraction: Extraction = fromModel ?? extractFromUtterance(text, extractContext(s));
+  const applied = applyExtraction({ ...s, transcript: [...s.transcript, userItem] }, extraction, turnId);
+  const reply = coachReply(applied.profile, extraction, seq, fromModel?.ack ?? null);
+  const phase = extraction.wantsEnd ? 'review' : reply.asked === 'mini_practice' && !extraction.clarification ? 'mini_practice' : 'interviewing';
+  return { ...applied, transcript: [...applied.transcript, item('coach', reply.text, seq + 1)], askedField: reply.asked, phase };
 }
 
 /** Skips the mini-practice and goes straight to review. */
@@ -342,7 +349,7 @@ export const ConfirmRequestSchema = z.object({
 export async function confirmProfile(deps: PlatformDeps, ownerId: string, id: string, expectedRevision: number, confirmed: ProfileKey[]): Promise<IntakeView> {
   const store = intakeStore(deps);
   const before = await store.readOwned(id, ownerId);
-  if (before.mediaStatus === 'active' || before.mediaStatus === 'connecting') await stopMedia(deps, ownerId, id, 'confirm');
+  if (before.mediaStatus === 'active' || before.mediaStatus === 'connecting' || before.mediaStatus === 'stopping') await stopMedia(deps, ownerId, id, 'confirm');
   const { session, written } = await store.update(id, (s) => {
     if (s.revision !== expectedRevision && s.revision !== expectedRevision + 1) return null;
     const profile = confirmFields(s.profile, confirmed);
@@ -381,7 +388,13 @@ async function settleMediaBudget(deps: PlatformDeps, s: IntakeSession) {
   if (!s.budgetReservation || !s.deadlineAt) return;
   const startedMs = new Date(s.deadlineAt).getTime() - MEDIA_LIMIT_MS;
   const minutes = Math.max(1, Math.ceil((deps.now().getTime() - startedMs) / 60_000));
-  await deps.budget.reconcile(s.budgetReservation, Math.min(5, minutes) * COST_ESTIMATES.realtimePerMinute).catch(() => undefined);
+  const perMinute = s.budgetReservation.category === 'avatar' ? COST_ESTIMATES.avatarPerMinute : COST_ESTIMATES.realtimePerMinute;
+  await deps.budget.reconcile(s.budgetReservation, Math.min(5, minutes) * perMinute).catch(() => undefined);
+}
+
+/** Best effort: a missed stop is bounded by the session's max_session_duration on LiveAvatar's side. */
+async function stopProviderSession(deps: PlatformDeps, s: IntakeSession) {
+  if (s.providerSessionId) await deps.liveAvatar?.stopSession(s.providerSessionId).catch(() => undefined);
 }
 
 /** Closes media for this intake. Never blocked by a stale revision; bumps the provider epoch so late tool calls are ignored. */
@@ -394,29 +407,41 @@ export async function stopMedia(deps: PlatformDeps, ownerId: string, id: string,
       return s.phase === 'interviewing' || s.phase === 'mini_practice' || s.phase === 'lobby' || s.phase === 'connecting' ? { ...s, phase: reason === 'end' ? 'review' : s.phase } : null;
     }
     settled = s;
-    const phase = s.phase === 'completed' ? s.phase : s.phase === 'connecting' || s.phase === 'lobby' ? 'interrupted' : 'review';
-    return { ...s, mediaStatus: 'closed', providerEpoch: s.providerEpoch + 1, phase, budgetReservation: null };
+    // A video call that fails after minting is already 'interviewing'; it continues with the next coach, not review.
+    // Once Alex has asked to end (phase 'review'), a late drop still goes to review.
+    const failedVideo = s.mode === 'video' && reason === 'fallback' && s.phase !== 'review';
+    const phase = s.phase === 'completed' ? s.phase : failedVideo || s.phase === 'connecting' || s.phase === 'lobby' ? 'interrupted' : 'review';
+    return { ...s, mediaStatus: 'closed', providerEpoch: s.providerEpoch + 1, phase, budgetReservation: null, providerSessionId: null };
   });
-  if (settled) await settleMediaBudget(deps, settled);
+  const closed = settled as IntakeSession | null;
+  if (closed) {
+    await settleMediaBudget(deps, closed);
+    await stopProviderSession(deps, closed);
+  }
   return view(deps, session);
 }
 
 export async function deleteIntake(deps: PlatformDeps, ownerId: string, id: string): Promise<void> {
   const store = intakeStore(deps);
   const session = await store.readOwned(id, ownerId);
-  if (session.mediaStatus === 'active' || session.mediaStatus === 'connecting') await settleMediaBudget(deps, session);
+  if (session.mediaStatus === 'active' || session.mediaStatus === 'connecting' || session.mediaStatus === 'stopping') await settleMediaBudget(deps, session);
+  await stopProviderSession(deps, session);
   await store.delete(id);
 }
 
+interface MediaAttempt {
+  current: IntakeSession;
+  resuming: boolean;
+  reservation: IntakeSession['budgetReservation'];
+  now: Date;
+}
+
 /**
- * Starts (or resumes) the audio call: one paid attempt per explicit connect, at most three
- * per IP per day, five minutes from the first connect. Returns a short-lived client secret.
+ * Shared start of a paid call attempt: ownership, revision and deadline checks, then one quota
+ * unit and a five-minute budget hold, unless an attempt within the deadline is being resumed.
  */
-export async function connectAudio(deps: PlatformDeps, ownerId: string, ipHash: string, id: string, expectedRevision: number) {
-  const env = serverEnv();
-  if (!deps.capabilities.coachVoice || !env.openaiRealtime) throw new ApiError('FEATURE_DISABLED', 'The voice call is not available right now. Continue by typing.');
-  const store = intakeStore(deps);
-  const current = await store.readOwned(id, ownerId);
+async function beginMediaAttempt(deps: PlatformDeps, ownerId: string, ipHash: string, id: string, expectedRevision: number, category: 'realtime' | 'avatar', perMinute: number): Promise<MediaAttempt> {
+  const current = await intakeStore(deps).readOwned(id, ownerId);
   if (current.phase === 'completed') throw new ApiError('INVALID_INPUT', 'This coach session is finished.');
   if (current.revision !== expectedRevision) throw new ApiError('VERSION_CONFLICT', 'Reload and try again.', { currentVersion: current.revision });
   const now = deps.now();
@@ -427,26 +452,105 @@ export async function connectAudio(deps: PlatformDeps, ownerId: string, ipHash: 
   let reservation = current.budgetReservation;
   if (!resuming) {
     await deps.quota.consume('intake', ipHash, ownerId);
-    reservation = await deps.budget.reserve('realtime', 5 * COST_ESTIMATES.realtimePerMinute);
+    reservation = await deps.budget.reserve(category, 5 * perMinute);
   }
+  return { current, resuming, reservation, now };
+}
+
+async function abandonMediaAttempt(deps: PlatformDeps, ipHash: string, attempt: MediaAttempt) {
+  if (attempt.resuming) return;
+  if (attempt.reservation) await deps.budget.reconcile(attempt.reservation, 0);
+  await deps.quota.refund('intake', ipHash);
+}
+
+function openAttempt(s: IntakeSession, mode: 'audio' | 'video', attempt: MediaAttempt, providerSessionId: string | null): IntakeSession {
+  return {
+    ...s,
+    mode,
+    mediaStatus: 'connecting',
+    phase: s.phase === 'lobby' || s.phase === 'interrupted' ? 'interviewing' : s.phase,
+    providerEpoch: s.providerEpoch + 1,
+    deadlineAt: attempt.resuming ? s.deadlineAt : new Date(attempt.now.getTime() + MEDIA_LIMIT_MS).toISOString(),
+    budgetReservation: attempt.reservation,
+    providerSessionId,
+    // The video coach speaks what the server writes, so the first connect starts with the greeting.
+    transcript: mode === 'video' && s.transcript.length === 0 ? [item('coach', GREETING, 1)] : s.transcript,
+  };
+}
+
+/**
+ * Starts (or resumes) the audio call: one paid attempt per explicit connect, at most three
+ * per IP per day, five minutes from the first connect. Returns a short-lived client secret.
+ */
+export async function connectAudio(deps: PlatformDeps, ownerId: string, ipHash: string, id: string, expectedRevision: number) {
+  const env = serverEnv();
+  if (!deps.capabilities.coachVoice || !env.openaiRealtime) throw new ApiError('FEATURE_DISABLED', 'The voice call is not available right now. Continue by typing.');
+  const attempt = await beginMediaAttempt(deps, ownerId, ipHash, id, expectedRevision, 'realtime', COST_ESTIMATES.realtimePerMinute);
+  await stopProviderSession(deps, attempt.current);
   let secret;
   try {
     secret = await mintRealtimeSecret({ apiKey: env.openaiRealtime.apiKey, model: env.openaiRealtime.model, voice: env.openaiRealtime.voice, transcribeModel: process.env.OPENAI_TRANSCRIBE_MODEL?.trim() || 'gpt-4o-mini-transcribe' });
   } catch {
-    if (!resuming && reservation) await deps.budget.reconcile(reservation, 0);
-    if (!resuming) await deps.quota.refund('intake', ipHash);
+    await abandonMediaAttempt(deps, ipHash, attempt);
     throw new ApiError('UPSTREAM_UNAVAILABLE', 'The voice call could not start. Continue by typing; your answers are kept.', {}, 10);
   }
-  const { session } = await store.update(id, (s) => ({
-    ...s,
-    mode: 'audio',
-    mediaStatus: 'connecting',
-    phase: s.phase === 'lobby' || s.phase === 'interrupted' ? 'interviewing' : s.phase,
-    providerEpoch: s.providerEpoch + 1,
-    deadlineAt: resuming ? s.deadlineAt : new Date(now.getTime() + MEDIA_LIMIT_MS).toISOString(),
-    budgetReservation: reservation,
-  }));
+  const { session } = await intakeStore(deps).update(id, (s) => openAttempt(s, 'audio', attempt, null));
   return { intake: view(deps, session), clientSecret: secret.value, expiresAt: secret.expiresAt, model: env.openaiRealtime.model, providerEpoch: session.providerEpoch, deadlineAt: session.deadlineAt! };
+}
+
+/**
+ * Starts (or resumes) the avatar video call with the same quota, budget and deadline rules.
+ * Returns only a short-lived LiveAvatar session token; keys and the agent secret stay here.
+ */
+export async function connectVideo(deps: PlatformDeps, ownerId: string, ipHash: string, id: string, expectedRevision: number) {
+  const liveAvatar = deps.liveAvatar;
+  if (!deps.capabilities.avatarIntake || !liveAvatar) throw new ApiError('FEATURE_DISABLED', 'The video call is not available right now.');
+  const attempt = await beginMediaAttempt(deps, ownerId, ipHash, id, expectedRevision, 'avatar', COST_ESTIMATES.avatarPerMinute);
+  await stopProviderSession(deps, attempt.current);
+  const deadlineMs = attempt.resuming && attempt.current.deadlineAt ? new Date(attempt.current.deadlineAt).getTime() : attempt.now.getTime() + MEDIA_LIMIT_MS;
+  let token;
+  try {
+    // Five seconds short of the deadline, so the local countdown ends the call before LiveAvatar cuts it off.
+    token = await liveAvatar.mintToken({ maxSeconds: (deadlineMs - attempt.now.getTime()) / 1_000 - 5 });
+  } catch (error) {
+    // Status only: provider bodies are never logged.
+    logEvent('warn', 'liveavatar.token_failed', { reason: error instanceof Error ? error.message : 'unknown' });
+    await abandonMediaAttempt(deps, ipHash, attempt);
+    throw new ApiError('UPSTREAM_UNAVAILABLE', 'The video call could not start. Your answers are kept.', {}, 10);
+  }
+  let session;
+  try {
+    ({ session } = await intakeStore(deps).update(id, (s) => openAttempt(s, 'video', attempt, token.sessionId)));
+  } catch (error) {
+    await abandonMediaAttempt(deps, ipHash, attempt);
+    await liveAvatar.stopSession(token.sessionId).catch(() => undefined);
+    throw error;
+  }
+  return { intake: view(deps, session), sessionToken: token.sessionToken, providerEpoch: session.providerEpoch, deadlineAt: session.deadlineAt! };
+}
+
+export const VideoTurnSchema = z.object({ providerEpoch: z.number().int(), itemId: z.string().min(1).max(160), text: z.string().trim().min(1).max(4_000) });
+
+/**
+ * A final user transcript from the video call (LiveAvatar FULL does the speech recognition).
+ * Runs the same deterministic coach as typed answers and returns the line Alex should say.
+ * Events from an older attempt, or after the call closed, change nothing and get no reply.
+ */
+export async function videoTurn(deps: PlatformDeps, ownerId: string, id: string, input: z.infer<typeof VideoTurnSchema>): Promise<{ intake: IntakeView; reply: string | null }> {
+  const store = intakeStore(deps);
+  const current = await store.readOwned(id, ownerId);
+  const turnId = `vt_${input.itemId}`;
+  const live = current.mode === 'video' && current.providerEpoch === input.providerEpoch && current.phase === 'interviewing' && !current.transcript.some((t) => t.turnId === turnId);
+  const reading = live ? await readWithModel(deps, input.text, extractContext(current)) : null;
+  const { session } = await store.update(id, (s) => {
+    if (s.mode !== 'video' || s.providerEpoch !== input.providerEpoch || s.mediaStatus === 'closed' || s.mediaStatus === 'stopping') return null;
+    if (s.phase !== 'interviewing' && s.phase !== 'mini_practice') return null;
+    if (s.transcript.some((t) => t.turnId === turnId)) return null;
+    return { ...coachTurn(s, input.text, turnId, false, reading, current.revision), mediaStatus: 'active' };
+  });
+  const index = session.transcript.findIndex((t) => t.turnId === turnId);
+  const next = index >= 0 ? session.transcript[index + 1] : undefined;
+  return { intake: view(deps, session), reply: next?.role === 'coach' ? next.text : null };
 }
 
 export const TranscriptEventSchema = z.object({ providerEpoch: z.number().int(), itemId: z.string().min(1).max(120), role: z.enum(['user', 'coach']), text: z.string().trim().min(1).max(4_000) });

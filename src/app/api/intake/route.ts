@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const CreateSchema = z.object({
-  mode: z.enum(['text', 'audio']),
+  mode: z.enum(['text', 'audio', 'video']),
   locale: z.literal('en').default('en'),
   consents: z.object({ audioAnalysis: z.boolean(), visualAnalysis: z.literal(false).default(false) }),
   consentVersion: z.number().int().min(1),

@@ -15,6 +15,7 @@ import { MoneyField } from '@/features/quiz/MoneyField';
 import { TextComposer } from '@/features/session/TextComposer';
 import type { IntakeAssessment, IntakeView, ProfileKey } from '../contracts';
 import { confirmIntake, deleteIntake, getAssessment, patchProfile, sendMessage, type Corrections } from '../client/api';
+import { CameraPractice } from './CameraPractice';
 import { moneyText } from './ProfileSoFar';
 
 const FIELD_LABELS: Partial<Record<ProfileKey, string>> = {
@@ -345,6 +346,8 @@ export function Review({ view, onView }: { view: IntakeView; onView: (v: IntakeV
           }
         }}
       />
+
+      <CameraPractice prompt={assessment?.practiceText ?? (target ? `I’d like to talk about my pay. I’m asking for ${moneyText({ ...target, basis: 'unspecified' })}, because of what I delivered this year.` : 'I’d like to talk about my pay, and the number I have in mind.')} />
 
       <section className="flex flex-wrap items-center gap-3 border-t border-line pt-5 text-[14px]">
         <span className="mr-auto text-muted">Kept for 24 hours in this browser’s session.</span>

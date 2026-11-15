@@ -1,6 +1,15 @@
 import 'server-only';
 import type { PlanKey } from '@/content/plans';
 
+/** LiveAvatar FULL video coach: LiveAvatar hears the user and speaks our coach's replies in this voice. */
+export interface LiveAvatarEnv {
+  mode: 'dev' | 'on';
+  apiKey: string;
+  avatarId: string;
+  voiceId: string;
+  sandbox: boolean;
+}
+
 export interface ServerEnv {
   nodeEnv: string;
   isProduction: boolean;
@@ -13,6 +22,9 @@ export interface ServerEnv {
   llmProvider: string;
   elevenlabs: { apiKey: string; agentId: string | null; customLlmSecret: string | null; sttModel: string; voiceMap: Record<string, string> } | null;
   openaiRealtime: { apiKey: string; model: string; voice: string } | null;
+  /** Opt-in on-device body-language step (MediaPipe in the browser). Off unless VISUAL_INTAKE=1. */
+  visualIntake: boolean;
+  liveAvatar: LiveAvatarEnv | null;
   s3: { endpoint: string; region: string; bucket: string; accessKeyId: string; secretAccessKey: string } | null;
   /** `products` maps each plan on /pricing to its Polar product; a plan without one cannot be bought. */
   polar: { accessToken: string; webhookSecret: string; products: Partial<Record<PlanKey, string>>; server: 'sandbox' | 'production'; priceMinor: number } | null;
@@ -44,6 +56,23 @@ function parseVoiceMap(raw: string | null): Record<string, string> {
   } catch {
     return {};
   }
+}
+
+/**
+ * The avatar call is opt-in. `dev` works only outside production (LiveAvatar sandbox unless
+ * LIVEAVATAR_SANDBOX=false); `on` only once a person marks the custom avatar approved, so
+ * production never shows a stock face.
+ */
+function readLiveAvatar(env: NodeJS.ProcessEnv, isProduction: boolean): LiveAvatarEnv | null {
+  const flag = str(env.AVATAR_CALL)?.toLowerCase();
+  if (flag !== 'dev' && flag !== 'on') return null;
+  if (flag === 'dev' && isProduction) return null;
+  if (flag === 'on' && env.LIVEAVATAR_AVATAR_APPROVED !== 'true') return null;
+  const apiKey = str(env.LIVEAVATAR_API_KEY);
+  const avatarId = str(env.LIVEAVATAR_AVATAR_ID);
+  const voiceId = str(env.LIVEAVATAR_VOICE_ID);
+  if (!apiKey || !avatarId || !voiceId) return null;
+  return { mode: flag, apiKey, avatarId, voiceId, sandbox: flag === 'dev' && env.LIVEAVATAR_SANDBOX !== 'false' };
 }
 
 let cached: ServerEnv | null = null;
@@ -88,6 +117,7 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
     redis,
     allowInsecureCookies: env.HOLDLINE_ALLOW_INSECURE_COOKIES === '1' || !isProduction,
     anthropicKey: str(env.ANTHROPIC_API_KEY),
+    visualIntake: env.VISUAL_INTAKE === '1',
     llmProvider: (str(env.LLM_PROVIDER) ?? 'anthropic').toLowerCase(),
     elevenlabs: elevenKey
       ? {
@@ -99,6 +129,7 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
         }
       : null,
     openaiRealtime: openaiKey && realtimeModel ? { apiKey: openaiKey, model: realtimeModel, voice: str(env.OPENAI_REALTIME_VOICE) ?? 'marin' } : null,
+    liveAvatar: readLiveAvatar(env, isProduction),
     s3:
       s3Endpoint && s3Bucket && s3Key && s3Secret
         ? { endpoint: s3Endpoint.replace(/\/$/, ''), region: str(env.S3_REGION) ?? 'auto', bucket: s3Bucket, accessKeyId: s3Key, secretAccessKey: s3Secret }

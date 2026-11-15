@@ -113,7 +113,7 @@ export const IntakeSessionSchema = z.object({
   profile: IntakeProfileSchema,
   consentVersion: z.number().int(),
   consents: ConsentsSchema,
-  mode: z.enum(['text', 'audio']),
+  mode: z.enum(['text', 'audio', 'video']),
   mediaStatus: z.enum(['not_started', 'connecting', 'active', 'stopping', 'closed']),
   providerEpoch: z.number().int(),
   startedAt: z.string(),
@@ -128,7 +128,9 @@ export const IntakeSessionSchema = z.object({
   assessment: IntakeAssessmentSchema.nullable(),
   handoff: IntakeHandoffSchema.nullable(),
   toolCalls: z.array(z.string()),
-  budgetReservation: z.object({ id: z.string(), day: z.string(), category: z.enum(['llm', 'scribe', 'agents', 'realtime']), micros: z.number() }).nullable(),
+  budgetReservation: z.object({ id: z.string(), day: z.string(), category: z.enum(['llm', 'scribe', 'agents', 'realtime', 'avatar']), micros: z.number() }).nullable(),
+  /** LiveAvatar session of the current video attempt. Server-only; never in the view. Optional for drafts stored before video existed. */
+  providerSessionId: z.string().nullable().optional(),
 });
 export type IntakeSession = z.infer<typeof IntakeSessionSchema>;
 
@@ -139,11 +141,11 @@ export interface IntakeView {
   revision: number;
   profileRevision: number;
   phase: IntakePhase;
-  mode: 'text' | 'audio';
+  mode: 'text' | 'audio' | 'video';
   mediaStatus: IntakeSession['mediaStatus'];
   publicProfile: IntakeProfile;
   committedTranscript: { turnId: string; role: 'user' | 'coach'; text: string }[];
-  availability: { coachVoice: boolean; audioAnalysis: boolean };
+  availability: { coachVoice: boolean; avatarIntake: boolean; audioAnalysis: boolean };
   consents: Consents;
   consentVersion: number;
   missingFields: string[];

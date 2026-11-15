@@ -55,6 +55,7 @@ export function makeDeps(overrides: Partial<PlatformDeps> & { scribeTranscript?:
     scribe,
     elevenlabs: { conversationToken: async () => 'conv-token', signedUrl: async () => 'wss://signed' },
     polar: { createCheckout: async () => ({ id: 'chk_1', url: 'https://polar.test/checkout/chk_1' }) },
+    liveAvatar: null,
     schedule: (task) => {
       tasks.push(task);
     },

@@ -37,11 +37,36 @@ type FactoryScope = { ModuleFactory?: unknown }
  * landmarker (or the CPU retry) would find it unset. Import the loader ourselves once and put
  * the factory back before every create.
  */
-async function loadModuleFactory(loaderPath: string): Promise<() => void> {
-  const mod = (await import(/* @vite-ignore */ loaderPath)) as { default?: unknown }
-  const factory = mod.default ?? (globalThis as FactoryScope).ModuleFactory
+async function loadModuleFactory(loaderPath: string, classic = false): Promise<() => void> {
+  let factory: unknown
+  if (classic) {
+    // Classic worker (Next.js/Turbopack): the non-module loader sets self.ModuleFactory when run.
+    ;(self as unknown as { importScripts(url: string): void }).importScripts(loaderPath)
+    factory = (globalThis as FactoryScope).ModuleFactory
+  } else {
+    // Loaded at runtime from /intake/wasm: tell every bundler (Vite, webpack, Turbopack) not to resolve it.
+    const mod = (await import(/* @vite-ignore */ /* webpackIgnore: true */ /* turbopackIgnore: true */ loaderPath)) as { default?: unknown }
+    factory = mod.default ?? (globalThis as FactoryScope).ModuleFactory
+  }
   if (typeof factory !== 'function') throw new Error('vision: wasm loader exported no ModuleFactory')
   return () => { (globalThis as FactoryScope).ModuleFactory = factory }
+}
+
+/**
+ * Vite runs the vision worker as an ES module worker; Next.js (Turbopack) runs it as a classic worker.
+ * MediaPipe loads its wasm loader with importScripts() first, which in a classic worker cannot run the
+ * ES-module loader, so a classic worker must use MediaPipe's classic loader instead. A module worker
+ * throws a TypeError on importScripts(); a classic one accepts an empty call as a no-op.
+ */
+function isClassicWorker(): boolean {
+  const scope = self as unknown as { importScripts?: (...urls: string[]) => void }
+  if (typeof scope.importScripts !== 'function') return false
+  try {
+    scope.importScripts()
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** GPU first; some browsers (notably Safari in workers) only manage CPU. */
@@ -61,8 +86,9 @@ export async function createInference(o: InferenceOptions): Promise<Inference> {
   if (!manifestRes.ok) throw new Error(`failed to load vision manifest: HTTP ${manifestRes.status}`)
   const manifest = (await manifestRes.json()) as Record<string, string>
   const model = (file: string) => loadVerified(`${o.assetBase}/models/${file}`, manifest[file])
-  const fileset = await FilesetResolver.forVisionTasks(`${o.assetBase}/wasm`, true)
-  const restoreFactory = await loadModuleFactory(new URL(fileset.wasmLoaderPath, self.location.href).href)
+  const classic = isClassicWorker()
+  const fileset = await FilesetResolver.forVisionTasks(`${o.assetBase}/wasm`, !classic)
+  const restoreFactory = await loadModuleFactory(new URL(fileset.wasmLoaderPath, self.location.href).href, classic)
 
   // Close any landmarker already created if a later step throws, so a failed init leaks no WASM heap.
   const made: { close(): void }[] = []
