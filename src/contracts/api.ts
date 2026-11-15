@@ -77,6 +77,8 @@ export const ConfigResponseSchema = z.object({
   paidProduct: z
     .object({ productKey: z.literal('conversation_pack'), priceMinor: z.number().int(), currency: z.literal('USD'), billing: z.literal('one_time') })
     .nullable(),
+  /** Plans on /pricing that have a checkout on this deployment. Empty when payments are off. */
+  paidPlans: z.array(z.enum(['trial', 'monthly', 'annual'])).default([]),
 });
 export type ConfigResponse = z.infer<typeof ConfigResponseSchema>;
 
@@ -176,7 +178,8 @@ export const AnalyzeRequestSchema = z.object({ sessionId: z.string().min(1), aud
 export const AnalyzeResponseSchema = z.object({ analysisId: z.string(), status: z.literal('pending') });
 export const AnalysisResponseSchema = z.object({ analysisId: z.string(), metrics: VoiceMetricsSchema });
 
-export const CheckoutRequestSchema = z.object({ productKey: z.literal('conversation_pack') });
+export const PlanKeySchema = z.enum(['trial', 'monthly', 'annual']);
+export const CheckoutRequestSchema = z.object({ plan: PlanKeySchema });
 export const CheckoutResponseSchema = z.object({ checkoutUrl: z.string(), checkoutId: z.string() });
 
 export const EntitlementResponseSchema = z.object({

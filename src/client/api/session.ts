@@ -68,8 +68,8 @@ export async function getEntitlement(): Promise<EntitlementResponse> {
   return apiFetch<EntitlementResponse>('/api/entitlement');
 }
 
-export async function startCheckout(): Promise<{ checkoutUrl: string; checkoutId: string }> {
-  return apiFetch('/api/polar/checkout', { body: { productKey: 'conversation_pack' }, idempotencyKey: newClientId('checkout') });
+export async function startCheckout(plan: 'trial' | 'monthly' | 'annual'): Promise<{ checkoutUrl: string; checkoutId: string }> {
+  return apiFetch('/api/polar/checkout', { body: { plan }, idempotencyKey: newClientId('checkout') });
 }
 
 export async function createCustomScenario(quiz: QuizAnswers, description: string): Promise<{ scenarioId: string }> {

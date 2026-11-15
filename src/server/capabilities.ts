@@ -11,7 +11,9 @@ export function computeCapabilities(env: ServerEnv, storage: { durable: boolean;
   const eleven = env.elevenlabs;
   const voice = spendOk && Boolean(eleven?.agentId && eleven.customLlmSecret);
   const voiceAnalysis = spendOk && Boolean(eleven) && storage.audio;
-  const payments = Boolean(env.polar) && storage.durable && Boolean(env.appUrl);
+  // Entitlements live in the KV. An explicitly chosen memory driver is accepted for a demo deployment:
+  // access granted by a webhook is then lost on restart.
+  const payments = Boolean(env.polar) && (storage.durable || env.storageDriver === 'memory') && Boolean(env.appUrl);
   return {
     voice,
     voiceAnalysis,

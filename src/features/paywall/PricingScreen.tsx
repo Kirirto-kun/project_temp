@@ -8,14 +8,14 @@ import type { ConfigResponse, EntitlementResponse } from '@/contracts/api';
 import { formatMoney } from '@/domain/money';
 import { ApiClientError } from '@/client/api/client';
 import { getConfig, getEntitlement, startCheckout } from '@/client/api/session';
-import { PLANS, PRICING_HEADLINE, TRIAL_THEN } from '@/content/plans';
+import { PLANS, PRICING_HEADLINE, TRIAL_THEN, type PlanKey } from '@/content/plans';
 
 export function PricingScreen() {
   const params = useSearchParams();
   const [config, setConfig] = useState<ConfigResponse | null>(null);
   const [entitlement, setEntitlement] = useState<EntitlementResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<PlanKey | null>(null);
   const returned = params.get('checkout') === 'success';
 
   useEffect(() => {
@@ -37,19 +37,22 @@ export function PricingScreen() {
     };
   }, [returned]);
 
-  async function buy() {
-    setBusy(true);
+  async function buy(plan: PlanKey) {
+    setBusy(plan);
     setError(null);
     try {
-      const checkout = await startCheckout();
+      const checkout = await startCheckout(plan);
       window.location.assign(checkout.checkoutUrl);
     } catch (err) {
-      setBusy(false);
+      setBusy(null);
       setError(err instanceof ApiClientError ? err.message : 'Checkout is not available right now.');
     }
   }
 
-  const product = config?.paidProduct ?? null;
+  const purchasable = config?.paidPlans ?? [];
+  // A checkout that was opened and abandoned leaves the entitlement pending; only wait for it right after returning from checkout.
+  const waiting = entitlement?.status === 'pending' && returned;
+  const canBuy = entitlement?.status !== 'active' && !waiting;
   const freeItems = ['The coach call or the quick form', 'A full round with your counterpart', 'The full debrief, money and voice'];
   const packItems = ['One scenario written from your own description', 'One analysis of a real offer you paste in'];
   return (
@@ -101,6 +104,12 @@ export function PricingScreen() {
                   </div>
                   {plan.then && <span className="text-[13.5px] text-white/85">{plan.then}</span>}
                   {plan.guarantee && <span className="text-[13.5px] text-white/85">{plan.guarantee}</span>}
+                  {canBuy && purchasable.includes(plan.key) && (
+                    <button type="button" className="btn btn-white mt-2 !max-w-none" onClick={() => void buy(plan.key)} disabled={busy !== null}>
+                      {busy === plan.key ? <Loader2 size={16} className="animate-spin" aria-hidden /> : null}
+                      {busy === plan.key ? 'Opening checkout…' : plan.key === 'trial' ? 'Start the 7-day trial' : `Choose ${plan.label}`}
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -130,17 +139,14 @@ export function PricingScreen() {
                   </Link>
                 </div>
               </>
-            ) : entitlement?.status === 'pending' ? (
+            ) : waiting ? (
               <p className="m-0 flex items-center gap-2 text-white/85" role="status">
                 <Loader2 size={16} className="animate-spin" aria-hidden /> Waiting for the payment confirmation…
               </p>
-            ) : product ? (
-              <button type="button" className="btn btn-white btn-xl !max-w-none" onClick={() => void buy()} disabled={busy}>
-                {busy ? <Loader2 size={18} className="animate-spin" aria-hidden /> : null}
-                {busy ? 'Opening checkout…' : 'Continue to checkout'}
-              </button>
+            ) : purchasable.length > 0 ? (
+              <p className="m-0 text-[13.5px] text-white/85">Checkout opens on our payment provider’s page. This deployment runs in test mode: no real card is charged.</p>
             ) : (
-              <p className="m-0 rounded-[14px] bg-white/12 p-3 text-[14px] text-white/85">Checkout is not switched on for this deployment yet, so no plan can be bought here.</p>
+              <p className="m-0 rounded-[14px] bg-white/12 p-3 text-[14px] text-white/85">Checkout is unavailable in this demo. Nothing will be charged.</p>
             )}
             {entitlement?.status === 'revoked' && <p className="m-0 rounded-[14px] bg-white/15 p-3 text-[14px] text-white">This pack was refunded, so its unused credits were removed.</p>}
             {error && (

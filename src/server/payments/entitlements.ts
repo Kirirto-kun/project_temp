@@ -46,9 +46,10 @@ interface PolarEvent {
 
 /**
  * Handles a Polar webhook: signature first, then event-id and order-id deduplication; grants
- * one pack per paid order of the configured product for the owner bound at checkout.
+ * one pack per paid order of a configured product for the owner bound at checkout.
  */
-export async function handlePolarWebhook(deps: PlatformDeps, rawBody: string, headers: WebhookHeaders, secret: string, productId: string): Promise<'ok' | 'duplicate' | 'ignored'> {
+export async function handlePolarWebhook(deps: PlatformDeps, rawBody: string, headers: WebhookHeaders, secret: string, productId: string | readonly string[]): Promise<'ok' | 'duplicate' | 'ignored'> {
+  const products = typeof productId === 'string' ? [productId] : productId;
   if (!verifyWebhook(rawBody, headers, secret, deps.now())) throw new ApiError('UNAUTHORIZED', 'Invalid webhook signature.');
   const eventKey = `whk:${headers.id}`;
   if (!(await deps.kv.set(eventKey, '1', { nx: true, ttlSeconds: 30 * 86_400 }))) return 'duplicate';
@@ -65,7 +66,7 @@ export async function handlePolarWebhook(deps: PlatformDeps, rawBody: string, he
   if (!ownerId || !/^own_[\w-]{22}$/.test(ownerId)) return 'ignored';
 
   if (event.type === 'order.paid' || (event.type === 'order.updated' && order.status === 'paid')) {
-    if (order.product_id !== productId) return 'ignored';
+    if (!order.product_id || !products.includes(order.product_id)) return 'ignored';
     if (!(await deps.kv.set(`ord:${order.id}`, ownerId, { nx: true }))) return 'duplicate';
     await updateJson<EntitlementRecord>(deps.kv, entKey(ownerId), (current) => {
       const record = current ?? EMPTY(ownerId!);
