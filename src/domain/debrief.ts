@@ -69,7 +69,8 @@ function describeTurn(config: ScenarioConfig, record: TurnRecord, delta: number,
       parts.push('You backed your number with a reason.');
       break;
     case 'concede':
-      parts.push(amount ? `You dropped to ${amount}${concession > 0 ? `, ${formatMoney(concession)} below your last ask` : ''}.` : 'You signalled you would accept less.');
+      if (config.objective === 'maximize') parts.push(amount ? `You dropped to ${amount}${concession > 0 ? `, ${formatMoney(concession)} below your last ask` : ''}.` : 'You signalled you would accept less.');
+      else parts.push(amount ? `You went up to ${amount}${concession > 0 ? `, ${formatMoney(concession)} above your last ask` : ''}.` : 'You signalled you would pay more.');
       break;
     case 'ask_question':
       parts.push('You asked a question instead of conceding.');
@@ -130,18 +131,23 @@ export function templateBetterLine(config: ScenarioConfig, record: TurnRecord): 
   const ask = record.before.userLastMinor ?? config.targetMinor;
   const askText = formatMoney(ask, config.period);
   const target = formatMoney(config.targetMinor, config.period);
+  // Rent, bills and other lower-is-better rounds: no pay-rise wording, and no invented facts.
+  const lower = config.objective === 'minimize';
   switch (record.move.type) {
     case 'state_number':
       if (!record.move.hasReason && record.move.amountMinor !== null) {
-        return `I'm asking for ${formatMoney(record.move.amountMinor, config.period)} because of what I delivered this year — I can walk you through the results.`;
+        const stated = formatMoney(record.move.amountMinor, config.period);
+        if (lower) return `I'm asking for ${stated}, and here is my reason — I can walk you through it.`;
+        return `I'm asking for ${stated} because of what I delivered this year — I can walk you through the results.`;
       }
       return null;
     case 'concede':
       return `Before I move, help me understand what's blocking ${askText}. What would make it workable?`;
     case 'ultimatum':
-      return `I'd like to find a number we can both stand behind. Here's why ${target} is fair for the role.`;
+      return `I'd like to find a number we can both stand behind. Here's why ${target} is fair${lower ? '' : ' for the role'}.`;
     case 'accept': {
       const goal = record.after.agreedMinor !== null && !isBetter(config.objective, config.targetMinor, record.after.agreedMinor) ? config.reservationAmountMinor : config.targetMinor;
+      if (lower) return `Before we close, I'd like to revisit the number — here is why ${formatMoney(goal, config.period)} is reasonable.`;
       return `Before we close, I'd like to revisit the number — ${formatMoney(goal, config.period)} reflects the scope I'm taking on.`;
     }
     case 'offtopic':

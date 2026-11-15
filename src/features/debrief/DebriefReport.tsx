@@ -133,7 +133,7 @@ export function DebriefReport({ debrief, example = false, actions }: { debrief: 
             agreedMinor={agreed}
           />
           <p className="m-0 mt-4 border-t border-line pt-4 text-[13px] leading-5 text-muted">
-            The {limitWord} is a scenario setting from the range you entered. It says nothing about what a real {debrief.counterpartRole.toLowerCase()} would pay.
+            The {limitWord} is a scenario setting from the range you entered. It says nothing about what a real {debrief.counterpartRole.toLowerCase()} would {debrief.objective === 'maximize' ? 'pay' : 'accept'}.
           </p>
         </div>
       </div>
@@ -147,7 +147,7 @@ export function DebriefReport({ debrief, example = false, actions }: { debrief: 
             Where the conversation turned
           </h2>
         </div>
-        <TurnLedger rows={debrief.rows} period={period} />
+        <TurnLedger rows={debrief.rows} period={period} objective={debrief.objective} />
       </section>
 
       {debrief.persuasionScore && (

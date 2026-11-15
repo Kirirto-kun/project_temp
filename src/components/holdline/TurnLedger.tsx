@@ -1,12 +1,13 @@
-import type { Period } from '@/contracts/domain';
+import type { Objective, Period } from '@/contracts/domain';
 import type { DebriefRow } from '@/contracts/voice';
 import { moveLabel } from '@/domain/debrief';
 import { formatMoney } from '@/domain/money';
 import { cn } from '@/components/ui/cn';
 
-function effectText(row: DebriefRow, period: Period): string {
+function effectText(row: DebriefRow, period: Period, objective: Objective): string {
   if (row.userConcessionMinor > 0) return `${formatMoney(row.userConcessionMinor)} conceded`;
-  if (row.offerDeltaMinor > 0) return `+${formatMoney(row.offerDeltaMinor, period)} offer`;
+  // offerDeltaMinor is "better for you": a higher pay offer, or a lower rent or bill.
+  if (row.offerDeltaMinor > 0) return `${objective === 'maximize' ? '+' : '−'}${formatMoney(row.offerDeltaMinor, period)} offer`;
   if (row.actionKind === 'walk_away') return 'They walked';
   const parts: string[] = [];
   if (row.meterEffect.trust) parts.push(`Trust ${row.meterEffect.trust > 0 ? '+' : ''}${row.meterEffect.trust}`);
@@ -47,7 +48,7 @@ const EFFECT: Record<DebriefRow['quality'], string> = {
 };
 
 /** Ledger of moves: money and voice of the same turn side by side. */
-export function TurnLedger({ rows, period }: { rows: DebriefRow[]; period: Period }) {
+export function TurnLedger({ rows, period, objective }: { rows: DebriefRow[]; period: Period; objective: Objective }) {
   if (rows.length === 0) return <p className="text-muted">No moves were played in this round.</p>;
   return (
     <ol className="m-0 flex list-none flex-col gap-3 p-0" aria-label="Moves ledger">
@@ -73,7 +74,7 @@ export function TurnLedger({ rows, period }: { rows: DebriefRow[]; period: Perio
               </p>
             )}
           </div>
-          <span className={cn('badge col-start-2 h-7 w-fit px-2.5 text-[11.5px] sm:col-start-3 sm:row-start-1', EFFECT[row.quality])}>{effectText(row, period)}</span>
+          <span className={cn('badge col-start-2 h-7 w-fit px-2.5 text-[11.5px] sm:col-start-3 sm:row-start-1', EFFECT[row.quality])}>{effectText(row, period, objective)}</span>
         </li>
       ))}
     </ol>

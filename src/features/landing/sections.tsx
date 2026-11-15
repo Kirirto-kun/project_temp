@@ -310,7 +310,7 @@ export function DebriefPreview({ debrief }: { debrief: Debrief }) {
           />
         </div>
         <div className="mt-4 hidden sm:block">
-          <TurnLedger rows={debrief.rows.slice(0, 2)} period={debrief.period} />
+          <TurnLedger rows={debrief.rows.slice(0, 2)} period={debrief.period} objective={debrief.objective} />
         </div>
       </InView>
     </section>

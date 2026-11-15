@@ -1,4 +1,4 @@
-import type { Archetype, ScenarioKind } from '@/contracts/domain';
+import type { Archetype, Objective, ScenarioKind } from '@/contracts/domain';
 
 /**
  * Safe counterpart lines. {amount} is filled by code from the engine action; no template
@@ -62,6 +62,30 @@ export const TEMPLATES: Record<Archetype, ReplyTemplates> = {
     outOfRange: ['Not happening.'],
   },
 };
+
+/**
+ * Lines that only make sense in a pay conversation ("the budget", "your role", "what you have
+ * delivered") are replaced when the user negotiates a price down (rent, bills). Same rules as
+ * above: {amount} is the only placeholder, no other numbers, same number of variants.
+ */
+const LOWER_PRICE_OVERRIDES: Partial<Record<Archetype, Partial<ReplyTemplates>>> = {
+  budget_guard: {
+    hold: ["I hear you, but the price doesn't move that easily.", "I understand. I still can't change the number right now."],
+    holdWithOffer: ['I can stay at {amount}. That is what I can do today.', 'Right now {amount} is what I can do.'],
+    probe: ['If you can give me a reason I can stand behind, I have a bit of room.', 'What would help is a clear reason why the price should change.'],
+  },
+  analyst: {
+    probe: ["What I'd need is evidence I can point to, not just a request.", 'Walk me through the data behind your number.'],
+  },
+  relationship: {
+    probe: ['Tell me what matters most to you here.', 'Help me understand what has changed on your side.'],
+  },
+};
+
+/** Templates for a counterpart; raise and offer rounds (maximize) use TEMPLATES unchanged. */
+export function templatesFor(archetype: Archetype, objective: Objective): ReplyTemplates {
+  return objective === 'minimize' ? { ...TEMPLATES[archetype], ...LOWER_PRICE_OVERRIDES[archetype] } : TEMPLATES[archetype];
+}
 
 export const OPENINGS: Record<Exclude<ScenarioKind, 'custom'>, readonly string[]> = {
   raise: ['Thanks for making time. You wanted to talk about your compensation?', 'Come in. You said you wanted to discuss your pay?'],
