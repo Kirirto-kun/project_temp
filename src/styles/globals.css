@@ -1294,4 +1294,50 @@ input[type='radio'] {
   white-space: nowrap;
   border: 0;
 }
+
+/* ---------------------------------------------------------------- Call room
+ * Meet/Zoom-style video room (CallStage). Always dark, in both site themes.
+ */
+.call-room {
+  --room-bg: #202124;
+  --room-tile: #2d2e31;
+  --room-raised: #3c4043;
+  --room-raised-hover: #4a4e52;
+  --room-danger: #ea4335;
+  --room-danger-hover: #d93025;
+  --room-ring: var(--violet-400);
+  background: var(--room-bg);
+  color: #fff;
+  color-scheme: dark;
+}
+.call-room :focus-visible {
+  outline: 2px solid var(--violet-300);
+  outline-offset: 2px;
+}
+.call-btn {
+  background: var(--room-raised);
+  color: #fff;
+}
+.call-btn-danger {
+  background: var(--room-danger);
+  color: #fff;
+}
+@media (hover: hover) and (pointer: fine) {
+  .call-btn:hover:not(:disabled) {
+    background: var(--room-raised-hover);
+  }
+  .call-btn-danger:hover:not(:disabled) {
+    background: var(--room-danger-hover);
+  }
+}
+.call-speaking-ring {
+  box-shadow:
+    inset 0 0 0 3px var(--room-ring),
+    inset 0 0 24px -6px color-mix(in srgb, var(--room-ring) 70%, transparent);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.call-speaking-ring[data-on='true'] {
+  opacity: 1;
+}
 } /* end components */
