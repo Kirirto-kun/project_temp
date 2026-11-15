@@ -123,6 +123,22 @@ describe('video call', () => {
     expect(next.committedTranscript.some((t) => t.text === 'I want a raise')).toBe(true);
   });
 
+  it('a drop after Alex asked to end still goes to review', async () => {
+    const { deps, v } = await videoIntake();
+    const connected = await connectVideo(deps, OWNER, IP, v.id, v.revision);
+    await handleTool(deps, OWNER, v.id, { providerEpoch: connected.providerEpoch, callId: 'call-end-2', name: 'request_end', arguments: '{}' });
+    await expect(stopMedia(deps, OWNER, v.id, 'fallback')).resolves.toMatchObject({ mediaStatus: 'closed', phase: 'review' });
+  });
+
+  it('deleting after Alex asked to end settles the hold', async () => {
+    const { deps, v } = await videoIntake();
+    const connected = await connectVideo(deps, OWNER, IP, v.id, v.revision);
+    await handleTool(deps, OWNER, v.id, { providerEpoch: connected.providerEpoch, callId: 'call-end-3', name: 'request_end', arguments: '{}' });
+    deps.clock.now += 60_000;
+    await deleteIntake(deps, OWNER, v.id);
+    expect(await deps.budget.spentToday()).toBe(COST_ESTIMATES.avatarPerMinute);
+  });
+
   it('confirming after Alex asked to end still stops the provider session and settles the hold', async () => {
     const { deps, liveAvatar, v } = await videoIntake();
     const connected = await connectVideo(deps, OWNER, IP, v.id, v.revision);

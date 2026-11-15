@@ -48,7 +48,7 @@ export function IntakeScreen({ id }: { id: string }) {
     const next = nextFallback(view, from);
     setNotice(reason);
     void getIntake(id)
-      .then(setView)
+      .then(setView, () => undefined)
       .finally(() => setFallback(next));
   };
   return (

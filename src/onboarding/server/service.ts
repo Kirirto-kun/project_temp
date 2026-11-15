@@ -379,7 +379,8 @@ export async function stopMedia(deps: PlatformDeps, ownerId: string, id: string,
     }
     settled = s;
     // A video call that fails after minting is already 'interviewing'; it continues with the next coach, not review.
-    const failedVideo = s.mode === 'video' && reason === 'fallback';
+    // Once Alex has asked to end (phase 'review'), a late drop still goes to review.
+    const failedVideo = s.mode === 'video' && reason === 'fallback' && s.phase !== 'review';
     const phase = s.phase === 'completed' ? s.phase : failedVideo || s.phase === 'connecting' || s.phase === 'lobby' ? 'interrupted' : 'review';
     return { ...s, mediaStatus: 'closed', providerEpoch: s.providerEpoch + 1, phase, budgetReservation: null, providerSessionId: null };
   });
@@ -394,7 +395,7 @@ export async function stopMedia(deps: PlatformDeps, ownerId: string, id: string,
 export async function deleteIntake(deps: PlatformDeps, ownerId: string, id: string): Promise<void> {
   const store = intakeStore(deps);
   const session = await store.readOwned(id, ownerId);
-  if (session.mediaStatus === 'active' || session.mediaStatus === 'connecting') await settleMediaBudget(deps, session);
+  if (session.mediaStatus === 'active' || session.mediaStatus === 'connecting' || session.mediaStatus === 'stopping') await settleMediaBudget(deps, session);
   await stopProviderSession(deps, session);
   await store.delete(id);
 }
