@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { SOURCE_CODE_URL } from '@/content/site';
 import { cn } from '@/components/ui/cn';
 import { Logo } from './Logo';
 import { SiteNav } from './SiteNav';
@@ -75,7 +76,7 @@ export function SiteFooter({ minimal = false }: { minimal?: boolean }) {
       </div>
       <div className="mx-auto flex max-w-[1120px] flex-wrap items-center justify-between gap-3 px-4 pb-4 text-[13px] text-muted">
         <span>No sign-up. Your round lives in this browser.</span>
-        <a href="https://github.com/azekowka/project_temp" className="text-muted">
+        <a href={SOURCE_CODE_URL} className="text-muted">
           Source code
         </a>
       </div>
