@@ -265,12 +265,13 @@ export async function submitPracticeAudio(deps: PlatformDeps, ownerId: string, i
   return view(deps, updated);
 }
 
+/**
+ * A read only returns what is stored. The text practice is refined (and saved) when it is posted;
+ * refining and saving again here bumped the intake revision behind the open review page, so every
+ * edit, tick and Confirm there failed with VERSION_CONFLICT.
+ */
 export async function getAssessment(deps: PlatformDeps, ownerId: string, id: string): Promise<IntakeAssessment | null> {
-  let session = await intakeStore(deps).readOwned(id, ownerId);
-  if (session.assessment && !session.assessment.speechAvailable && session.assessment.practiceText && deps.models.available && !session.assessment.stale) {
-    const refined = await refineWithModel(deps, session, session.assessment);
-    if (refined !== session.assessment) session = (await intakeStore(deps).update(id, (s) => ({ ...s, assessment: refined }))).session;
-  }
+  const session = await intakeStore(deps).readOwned(id, ownerId);
   return session.assessment;
 }
 
