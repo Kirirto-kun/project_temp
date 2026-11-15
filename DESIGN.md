@@ -17,7 +17,8 @@ All colours, shadows and curves live in `src/styles/tokens.css` and are exposed 
 
 - Light is the default. Dark applies only when picked (`data-theme="dark"`, stored as `hl-theme`); use the `dark:` variant for overrides.
 - Depth comes from semi-transparent rings and violet-tinted shadows (`--shadow-raise`, `--shadow-lift`, `--shadow-hold`), not solid borders.
-- Component classes (`.btn`, `.card`, `.option`, `.input`, `.chip`, `.badge`, `.callout`…) sit in `@layer components`, so Tailwind utilities always win over them.
+- Component classes (`.btn`, `.card`, `.choice`, `.input`, `.chip`, `.badge`, `.callout`…) sit in `@layer components`, so Tailwind utilities always win over them.
+- Every selectable option (kind, role, period, counterpart) is a `ChoiceCard` (`src/components/ui/ChoiceCard.tsx`): text-first row, 12px radius, hairline border, small inline icon in the text colour (no pastel icon tiles), selection shown by a brand border, a light tint and a small filled check at the trailing edge (no radio circles). `compact` drops the check for short centred labels.
 
 ## Type
 
