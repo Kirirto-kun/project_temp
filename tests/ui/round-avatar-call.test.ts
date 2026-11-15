@@ -52,7 +52,7 @@ describe('RoundAvatarCall', () => {
     await call.start();
     expect(events.state.mock.calls.map((c) => c[0])).toEqual(['connecting', 'active']);
     expect(session.setMuted).toHaveBeenCalledWith(false);
-    expect(session.speak).toHaveBeenCalledWith(opening.text);
+    expect(session.speak).toHaveBeenCalledWith(opening.text, expect.any(String));
     expect(session.setMuted.mock.invocationCallOrder[0]!).toBeLessThan(session.speak.mock.invocationCallOrder[0]!);
   });
 
@@ -63,7 +63,7 @@ describe('RoundAvatarCall', () => {
     callbacks().userSaid('  I would like $110,000 ', 'e1');
     await drain();
     expect(api.turn).toHaveBeenCalledWith('I would like $110,000');
-    expect(session.speak).toHaveBeenCalledWith('I can offer $104,000.');
+    expect(session.speak.mock.calls.map((c) => c[0])).toContain('I can offer $104,000.');
   });
 
   it('a turn that does not commit speaks nothing', async () => {
@@ -85,7 +85,7 @@ describe('RoundAvatarCall', () => {
     api.turn.mockImplementationOnce(async (text) => reply(text, last, 'accepted'));
     callbacks().userSaid('Deal', 'e1');
     await drain();
-    expect(session.speak).toHaveBeenLastCalledWith(last);
+    expect(session.speak.mock.lastCall?.[0]).toBe(last);
     // Barge-in is ignored during the goodbye, and so is new speech.
     callbacks().userSpeaking();
     callbacks().userSaid('one more thing', 'e2');

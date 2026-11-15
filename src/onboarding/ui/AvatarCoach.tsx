@@ -8,6 +8,8 @@ import type { IntakeView } from '../contracts';
 import { connectVideo, getIntake, postVideoTurn, stopIntake } from '../client/api';
 import { AvatarCall, type AvatarCallState } from '../client/avatar-call';
 import { createAvatarSession } from '../client/avatar-session';
+import { withServerVoice } from '@/client/voice/line-voice';
+import { markTextInteraction } from '@/client/voice/speech';
 import { Captions } from './TextCoach';
 import { ProfileSoFar } from './ProfileSoFar';
 
@@ -39,13 +41,15 @@ export function AvatarCoach({ view, onView, onFallback, onTypeInstead }: { view:
 
   function start() {
     if (callRef.current) return;
+    // Inside the click: unlocks audio playback for Alex's lines (Safari needs a gesture).
+    markTextInteraction();
     const call = new AvatarCall(
       {
         connect: () => connectVideo(view.id, view.revision),
         turn: (epoch, itemId, text) => postVideoTurn(view.id, epoch, itemId, text),
         stop: (reason) => stopIntake(view.id, reason),
       },
-      createAvatarSession,
+      withServerVoice(createAvatarSession, (turnId) => ({ kind: 'intake', id: view.id, turnId })),
       { state: setState, view: onView, speaking: setSpeaking, live: setLive, failed: onFallback },
     );
     callRef.current = call;
