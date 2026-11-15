@@ -120,6 +120,20 @@ select {
 } /* end base */
 
 @layer components {
+/* ---------------------------------------------------------------- Layout */
+
+/* The one page column. Header, main and footer all use it, so the logo, the content and the
+   right-most control share the same left and right edges. */
+.page-col {
+  width: 100%;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding-inline: var(--page-gutter);
+}
+.page-col-chat {
+  --page-max: 760px;
+}
+
 /* ---------------------------------------------------------------- Type */
 
 .eyebrow {

@@ -23,7 +23,7 @@ export default async function LandingPage() {
           <Principles />
           <LandingStats exampleLeftMinor={example.leftOnTableMinor} examplePeriod={example.period} />
 
-          <section className="mx-auto grid w-full max-w-[1120px] gap-10 px-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]" aria-labelledby="faq">
+          <section className="page-col grid gap-10 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]" aria-labelledby="faq">
             <div className="lg:sticky lg:top-28 lg:self-start">
               <p className="eyebrow m-0">FAQ</p>
               <h2 id="faq" className="h-section m-0 mt-4">

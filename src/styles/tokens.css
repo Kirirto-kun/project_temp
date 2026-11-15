@@ -56,6 +56,10 @@
   /* Glass header */
   --glass: rgba(255, 255, 255, 0.72);
 
+  /* Page column: the header, every page and the footer share it so their edges line up. */
+  --page-max: 1120px;
+  --page-gutter: 16px;
+
   color-scheme: light;
 }
 
@@ -106,4 +110,11 @@
   --dur-press: 160ms;
   --dur-fast: 200ms;
   --dur-base: 260ms;
+}
+
+/* Wider gutter for the page column from 640px up (theme-independent). */
+@media (min-width: 640px) {
+  :root {
+    --page-gutter: 24px;
+  }
 }
