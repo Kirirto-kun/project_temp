@@ -9,7 +9,7 @@ import { RAISE_CONFIG, RENT_CONFIG, move, playSession } from '@/testing/fixtures
 describe('DebriefReport', () => {
   it('shows left on the table with its formula for an accepted raise', async () => {
     const config = { ...RAISE_CONFIG, objections: [] };
-    const session = playSession(config, [move('state_number', 11_200_000, true), move('state_number', 11_200_000, true), move('state_number', 11_200_000, true), move('concede', 10_400_000)]);
+    const session = playSession(config, [move('state_number', 11_200_000, true), move('state_number', 11_200_000, true), move('state_number', 11_200_000, false), move('concede', 10_400_000)]);
     render(<DebriefReport debrief={await buildDebrief(session, null, NO_MODEL)} />);
     expect(screen.getByText('$8,000/year')).toBeInTheDocument();
     expect(screen.getByText(/\$112,000\/year ceiling − \$104,000\/year agreed/)).toBeInTheDocument();

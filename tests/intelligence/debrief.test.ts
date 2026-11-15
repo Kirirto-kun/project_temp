@@ -9,7 +9,7 @@ const session = playSession(config, [
   move('state_number', 11_200_000, false, 'I want 112k.'),
   move('state_number', 11_200_000, true, '112k because I lead the team.'),
   move('state_number', 11_200_000, true, '112k because I lead the team.'),
-  move('state_number', 11_200_000, true, '112k because I lead the team.'),
+  move('state_number', 11_200_000, false, 'I want 112k.'),
   move('concede', 10_400_000, false, 'Okay, 104k.'),
 ]);
 

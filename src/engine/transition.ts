@@ -1,5 +1,5 @@
 import type { CoreState, CounterpartAction, Move, ScenarioConfig } from '@/contracts/domain';
-import { stepToward, utility, worse } from '@/domain/money';
+import { better, stepToward, utility, worse } from '@/domain/money';
 import { clampMeter, openObjections } from './state';
 
 export interface TransitionResult {
@@ -131,10 +131,12 @@ export function applyMove(config: ScenarioConfig, state: CoreState, move: Move):
       }
       const reachableUtility = Math.min(utility(config.objective, offer) + step, utility(config.objective, config.reservationAmountMinor));
       if (utility(config.objective, ask) <= reachableUtility) {
+        // Never close at a number worse for the user than the offer already on the table.
+        const close = better(config.objective, ask, offer);
         draft.ended = 'accepted';
-        draft.agreedMinor = ask;
-        draft.offerMinor = ask;
-        action = { kind: 'accept', atMinor: ask };
+        draft.agreedMinor = close;
+        draft.offerMinor = close;
+        action = { kind: 'accept', atMinor: close };
       } else {
         action = { kind: 'hold' };
       }

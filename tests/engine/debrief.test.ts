@@ -34,11 +34,12 @@ describe('computeMoneyOutcome', () => {
 describe('buildDebriefRows', () => {
   it('does not double count a concession in the final gap', () => {
     const config = { ...RAISE_CONFIG, objections: [] };
-    // Ask $112,000 with a reason, then drop $8,000 to $104,000 which is reachable.
+    // Ask $112,000 with a reason twice (offer $101,800), repeat it bare, then drop $8,000 to
+    // $104,000, which is above the offer and within one step of it.
     const session = playSession(config, [
       move('state_number', 11_200_000, true),
       move('state_number', 11_200_000, true),
-      move('state_number', 11_200_000, true),
+      move('state_number', 11_200_000, false),
       move('concede', 10_400_000),
     ]);
     expect(session.state.ended).toBe('accepted');
