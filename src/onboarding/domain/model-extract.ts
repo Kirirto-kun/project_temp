@@ -56,7 +56,8 @@ export const MODEL_EXTRACTION_JSON_SCHEMA: Record<string, unknown> = {
   required: ['intent', 'kind', 'userRole', 'counterpartRole', 'currentMoney', 'targetMoney', 'marketRange', 'fear', 'reasons', 'conversationDate', 'ack'],
   properties: {
     intent: { type: 'string', enum: ['info', 'confirm', 'reject', 'skip', 'dont_know', 'end', 'unclear'] },
-    kind: { type: ['string', 'null'], enum: ['raise', 'offer', 'rent', 'bill', null] },
+    // A type array combined with `enum` is rejected by the provider (HTTP 400), so nullable enums use anyOf.
+    kind: { anyOf: [{ type: 'string', enum: ['raise', 'offer', 'rent', 'bill'] }, { type: 'null' }] },
     userRole: { type: ['string', 'null'], description: "The user's own job title, in English, 1-5 words. Null if not stated." },
     counterpartRole: { type: ['string', 'null'], description: 'Who the user will talk to, in English, e.g. "Manager", "Landlord". Null if not stated.' },
     currentMoney: { ...money, description: 'What the user is paid/charged now, or the offer on the table.' },
