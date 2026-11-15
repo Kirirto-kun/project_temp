@@ -28,9 +28,9 @@ async function api(operation:string,endpoint:string,method='POST',body?:unknown)
   if(result.code!==1000&&result.code!==100)throw new Error(operation+' was not acknowledged by LiveAvatar.');
   return result.data??{};
 }
-async function reference(key:string,operation:string,endpoint:string,body:unknown){
+async function reference(key:string,operation:string,endpoint:string,body:unknown,idField:'id'|'voice_id'='id'){
   if(env[key])return env[key]!;
-  const data=await api(operation,endpoint,'POST',body);const id=idSchema.parse(data.id);
+  const data=await api(operation,endpoint,'POST',body);const id=idSchema.parse(data[idField]);
   await save(key,id);console.log(operation+' configured. Reference saved in '+path+'.');return id;
 }
 
@@ -54,7 +54,7 @@ if(!env.ELEVENLABS_VOICE_ID){
   if(!voice)throw new Error('Choose ELEVENLABS_VOICE_ID in your ElevenLabs account.');
   await save('ELEVENLABS_VOICE_ID',idSchema.parse(voice.voice_id));console.log('Selected a premade ElevenLabs voice.');
 }
-await reference('LIVEAVATAR_VOICE_ID','TTS voice','/v1/voices/third_party',{secret_id:ttsSecret,provider_voice_id:env.ELEVENLABS_VOICE_ID,name:'Holdline Alex'});
+await reference('LIVEAVATAR_VOICE_ID','TTS voice','/v1/voices/third_party',{secret_id:ttsSecret,provider_voice_id:env.ELEVENLABS_VOICE_ID,name:'Holdline Alex'},'voice_id');
 await save('LIVEAVATAR_VOICE_SOURCE','elevenlabs');
 }
 console.log('LiveAvatar FULL voice configured. Our server owns dialogue; no ElevenLabs Agent or vendor LLM context was created. No session started and no plan purchased. Restart the app and cleanup process after updating call flags.');

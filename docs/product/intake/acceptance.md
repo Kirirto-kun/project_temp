@@ -5,11 +5,12 @@ Scope: any conversation, including interviews, feedback, conflict, relationships
 ## Verified before live media acceptance
 
 - The shared v2 profile has common kind/description/goal/counterpartRole, optional desiredTone and optional money/date/range/avatar fields. Unit tests cover nonfinancial custom/interview tool proposals, common missingFields, confirmation/handoff, goal correction, kind-switch monetary reset, explicit resent amounts, invalid units/ranges and legacy kindless money.
-- Universal profile TDD observed 16 expected failures before implementation. Final Vitest/SQL/setup suite passed 114/114, ESLint and optimized production build/TypeScript passed. Six additional regressions reproduced and fixed two review findings involving pre-claim supersession and post-model cancellation.
+- Universal profile TDD observed 16 expected failures before implementation. Latest Vitest/SQL/setup suite passed 115/115, including the provider setup CLI regression. ESLint and optimized production build/TypeScript passed. Six additional regressions reproduced and fixed two review findings involving pre-claim supersession and post-model cancellation.
 - Existing local/SQL tests cover owner isolation, idempotency/CAS, budgets, single client lease, absolute deadline, End/token races, retryable close, encrypted credentials, stale epochs, cleanup and cancellation. Direct callback/model/provider tests additionally cover bearer/HMAC binding, bounded inputs, replay/concurrency and late-write cancellation.
 - Eight Chromium browser regressions passed, including universal custom save/reload/confirm, salary→relationship switching/mobile and legacy monetary drafts. Desktop/mobile screenshots were inspected. Historical connector results do not certify the new FULL path.
 - Read-only account probes returned HTTP 200, with 10 LiveAvatar credits, an ACTIVE avatar and an active paid ElevenLabs account on 15 November 2026.
 - Real direct generation passed for claude-sonnet-5-5 and gpt-5.4-mini using a fictional nonfinancial prompt and valid compact reply/changes/action output. This verifies text generation and server decoding, not media.
+- The replacement ElevenLabs key was accepted, its secret/voice imported into LiveAvatar and a direct TTS probe generated audio successfully. Local configuration now uses that imported voice. This does not yet certify the complete avatar call with imported TTS.
 - Our raw audio/video is not persisted; camera publication and speech/visual analysis remain disabled in this module.
 
 ## Live media — sandbox passed, product acceptance partial

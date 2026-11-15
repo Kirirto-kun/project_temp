@@ -119,7 +119,7 @@ FULL 2 credits/min и 10 доступных credits дают примерно 5 
 
   ## 9. Пройти первый живой тест
 
-**Sandbox-проверка пройдена:** настоящее видео и звук, ASR, ответы модели, сохранение кандидата, ручное подтверждение и End с закрытием provider session/микрофона. Проверена production-сборка без подмены таймеров; LiveAvatar credits 10 → 10. Использован built-in test voice, не ElevenLabs. Для вашего TTS-голоса ключу пока недостаёт voices_read. Полная продуктовая приёмка, Safari и качество перебиваний остаются отдельно в [acceptance.md](acceptance.md); детали — в [progress.md](progress.md).
+**Sandbox-проверка пройдена:** настоящее видео и звук, ASR, ответы модели, сохранение кандидата, ручное подтверждение и End с закрытием provider session/микрофона. Проверена production-сборка без подмены таймеров; LiveAvatar credits 10 → 10. Этот прогон использовал built-in test voice. После обновления ключа ElevenLabs secret/voice успешно импортированы, реальный TTS-запрос вернул аудио; локальный сервис перезапущен с новым голосом. Полный звонок именно с импортированным TTS, продуктовая приёмка, Safari и качество перебиваний остаются отдельно в [acceptance.md](acceptance.md); детали — в [progress.md](progress.md).
 
 1. До Start нет звука, запроса устройств и provider session. Start → Check microphone; камеру сначала оставить выключенной.
 2. Connect to Alex. Проверить один слышимый голос, lip sync, субтитры и живое видео отдельно от постера. Записать voice source: built-in transport-only или импортированный ElevenLabs.
