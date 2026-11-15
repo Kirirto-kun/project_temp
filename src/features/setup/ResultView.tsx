@@ -73,7 +73,8 @@ export function ResultView() {
             )}
             <dt className="text-muted">Basis</dt>
             <dd className="m-0 text-right">
-              {d.moneyBasis === 'gross' ? 'Before tax' : d.moneyBasis === 'net' ? 'After tax' : 'Not specified'} · {periodLabel(d.period)}
+              {kind === 'raise' || kind === 'offer' ? `${d.moneyBasis === 'gross' ? 'Before tax' : d.moneyBasis === 'net' ? 'After tax' : 'Not specified'} · ` : ''}
+              {periodLabel(d.period)}
             </dd>
             <dt className="text-muted">Their limit</dt>
             <dd className="m-0 text-right">

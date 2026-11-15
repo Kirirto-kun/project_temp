@@ -107,6 +107,7 @@ export function QuizFlow() {
 
   function chooseKind(next: StandardKind) {
     const periods = allowedPeriodsForKind(next);
+    const salaryNext = next === 'raise' || next === 'offer';
     setDirection(1);
     setState((s) =>
       s
@@ -116,14 +117,19 @@ export function QuizFlow() {
             marketUnknown: false,
             practiceRangeConfirmed: false,
             avatarId: null,
+            intake: null,
             draft: {
               ...s.draft,
+              // A different kind starts clean: amounts, worry and salary-only answers do not carry over.
+              ...(s.draft.kind !== next
+                ? { currentMinor: undefined, targetMinor: undefined, fear: '', description: '', conversationDate: null, userRole: salaryNext ? s.draft.userRole : undefined }
+                : {}),
               kind: next,
               period: periods[0],
               counterpartRole: COUNTERPART_ROLES[next]![0],
               currency: 'USD',
               inputMode: 'personal',
-              moneyBasis: s.draft.moneyBasis ?? 'unspecified',
+              moneyBasis: salaryNext ? (s.draft.moneyBasis ?? 'unspecified') : 'unspecified',
               marketLowMinor: undefined,
               marketHighMinor: undefined,
               rangeSource: undefined,
@@ -168,6 +174,7 @@ export function QuizFlow() {
       setError(validation.errors[0]?.message ?? `Missing: ${validation.missingFields.join(', ')}`);
       return;
     }
+    setState((s) => (s ? { ...s, intake: null } : s));
     router.push('/result');
   }
 
