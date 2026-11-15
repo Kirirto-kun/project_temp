@@ -43,10 +43,12 @@ export function ResultView() {
         </h1>
       </header>
 
-      <section className="on-violet rise relative grid gap-3 overflow-hidden rounded-[28px] p-6 sm:p-8" style={{ ['--delay' as string]: '80ms' }} aria-label="Gap to your own target">
+      <section className="on-violet rise relative grid grid-cols-[minmax(0,1fr)] gap-3 overflow-hidden rounded-[28px] p-6 sm:p-8" style={{ ['--delay' as string]: '80ms' }} aria-label="Gap to your own target">
         <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full bg-violet-500/50 blur-2xl" aria-hidden />
         <div className="relative text-[12px] font-medium uppercase tracking-[0.08em] text-white/75">Gap to your own target</div>
-        <div className="figure-xl relative text-white">{formatMoney(preview.gapMinor, d.period)}</div>
+        <div className="figure-xl relative text-white" style={{ fontSize: 'min(9.2vw, clamp(48px, 7vw, 64px))' }}>
+          {formatMoney(preview.gapMinor, d.period)}
+        </div>
         <p className="relative m-0 text-[14px] leading-6 text-white/80">
           {objective === 'maximize'
             ? `${formatMoney(d.targetMinor, d.period)} − ${formatMoney(d.currentMinor, d.period)}`

@@ -69,7 +69,7 @@ export function Transcript({ messages, pending, counterpartLabel, typing, avatar
           </div>
         </div>
       )}
-      <div ref={endRef} aria-hidden />
+      <div ref={endRef} aria-hidden className="scroll-mb-36 sm:scroll-mb-0" />
     </div>
   );
 }

@@ -68,6 +68,21 @@ export function SessionScreen({ id }: { id: string }) {
     if (left === 0 && session && !session.ended) void getSession(id).then(accept).catch(() => undefined);
   }, [left, session, id, accept]);
 
+  // Keep the reply box (or the end-of-round card) in view, not only the newest line.
+  const columnRef = useRef<HTMLDivElement | null>(null);
+  const followed = useRef(false);
+  const lineCount = session ? session.messages.length + (pending ? 1 : 0) + (tentative ? 1 : 0) : null;
+  const roundOver = session ? session.ended !== null : false;
+  useEffect(() => {
+    if (lineCount === null) return;
+    // Follow changes only; on load the scoreboard above the chat stays in view.
+    if (!followed.current) {
+      followed.current = true;
+      return;
+    }
+    columnRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+  }, [lineCount, roundOver]);
+
   async function send(text: string): Promise<boolean> {
     if (!session) return false;
     const turnId = newClientId('turn');
@@ -150,7 +165,7 @@ export function SessionScreen({ id }: { id: string }) {
       </header>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-        <aside className="card grid min-w-0 gap-5 p-5 lg:sticky lg:top-24 lg:order-last" aria-label="Where the round stands">
+        <aside className="card grid min-w-0 gap-5 overflow-x-clip p-5 lg:sticky lg:top-24 lg:order-last" aria-label="Where the round stands">
           <div className="min-w-0">
             <div className="label">On the table</div>
             <div className="mt-2 text-[clamp(30px,5vw,38px)] font-extrabold leading-none tracking-[-0.045em]">
@@ -177,7 +192,7 @@ export function SessionScreen({ id }: { id: string }) {
           )}
         </aside>
 
-        <div className="grid min-w-0 gap-5">
+        <div ref={columnRef} className="grid min-w-0 gap-5 sm:scroll-mb-6">
           <div aria-live="polite" className="sr-only">
             {session.messages.at(-1)?.role === 'counterpart' ? `${counterpartLabel}: ${session.messages.at(-1)!.text}` : ''}
           </div>

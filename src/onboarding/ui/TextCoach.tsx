@@ -51,6 +51,12 @@ export function TextCoach({ view, onView }: { view: IntakeView; onView: (v: Inta
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const practising = view.phase === 'mini_practice';
+  // Keep the reply box in view, not only the newest line: on phones the sticky composer would cover that line.
+  const columnRef = useRef<HTMLDivElement | null>(null);
+  const lineCount = view.committedTranscript.length;
+  useEffect(() => {
+    columnRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+  }, [lineCount, busy]);
 
   async function send(text: string): Promise<boolean> {
     setError(null);
@@ -68,7 +74,7 @@ export function TextCoach({ view, onView }: { view: IntakeView; onView: (v: Inta
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-      <div className="grid gap-5">
+      <div ref={columnRef} className="grid gap-5 sm:scroll-mb-6">
         <div className="card flex items-center gap-3 p-3 pr-4">
           <CoachMark size={48} speaking={busy} />
           <div className="mr-auto leading-tight">

@@ -36,7 +36,7 @@ export function TextComposer({ disabled, onSend, initialText = '', placeholder =
         maxLength={LIMITS.replyMaxChars}
         placeholder={placeholder}
         value={text}
-        disabled={disabled}
+        readOnly={disabled}
         enterKeyHint="send"
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
