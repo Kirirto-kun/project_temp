@@ -94,7 +94,18 @@ export function DebriefScreen({ sessionId }: { sessionId: string }) {
       </div>
     );
   }
-  if (!debrief) return <ScreenSkeleton variant="report" label="Loading the debrief…" />;
+  if (!debrief) {
+    return (
+      <div className="mx-auto grid w-full max-w-[640px] gap-5">
+        {/* The first load can wait on the written comments; say so instead of showing bare placeholders. */}
+        <p className="fade-in m-0 flex items-center gap-2.5 text-[15px] leading-6 text-muted" style={{ ['--delay' as string]: '400ms' }} aria-hidden>
+          <Loader2 size={16} className="shrink-0 animate-spin" aria-hidden />
+          Writing your debrief. This can take several seconds.
+        </p>
+        <ScreenSkeleton variant="report" label="Writing your debrief. This can take several seconds." />
+      </div>
+    );
+  }
 
   return (
     <DebriefReport
