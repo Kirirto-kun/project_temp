@@ -16,9 +16,18 @@ export interface LiveAvatarSettings {
 
 export interface LiveAvatarClient {
   /** FULL session: LiveAvatar runs speech recognition and lip sync; our server writes every line Alex says. The API key never leaves the server. */
-  mintToken(input: { maxSeconds: number }): Promise<{ sessionId: string; sessionToken: string }>;
+  mintToken(input: { maxSeconds: number } & AvatarOverride): Promise<{ sessionId: string; sessionToken: string }>;
   /** An unknown or already-ended session (the browser SDK often stops first) counts as stopped. */
   stopSession(sessionId: string): Promise<void>;
+}
+
+/**
+ * A per-call avatar and voice (e.g. a negotiation counterpart). Ignored in the sandbox, which
+ * only accepts its one stock avatar, so the configured avatar and voice are used there.
+ */
+export interface AvatarOverride {
+  avatarId?: string;
+  voiceId?: string;
 }
 
 export class LiveAvatarError extends Error {}
@@ -26,7 +35,7 @@ export class LiveAvatarError extends Error {}
 export function createLiveAvatar(settings: LiveAvatarSettings, fetchImpl: typeof fetch = fetch): LiveAvatarClient {
   const headers = { 'X-API-KEY': settings.apiKey, 'Content-Type': 'application/json' };
   return {
-    async mintToken({ maxSeconds }) {
+    async mintToken({ maxSeconds, avatarId, voiceId }) {
       // The free sandbox rejects sessions longer than a minute.
       const seconds = Math.max(1, Math.min(settings.sandbox ? 60 : 300, Math.floor(maxSeconds)));
       const response = await fetchImpl(`${API}/sessions/token`, {
@@ -36,11 +45,11 @@ export function createLiveAvatar(settings: LiveAvatarSettings, fetchImpl: typeof
         signal: AbortSignal.timeout(15_000),
         body: JSON.stringify({
           mode: 'FULL',
-          avatar_id: settings.avatarId,
+          avatar_id: (!settings.sandbox && avatarId) || settings.avatarId,
           is_sandbox: settings.sandbox,
           max_session_duration: seconds,
           video_settings: { quality: 'high', encoding: 'H264' },
-          avatar_persona: { voice_id: settings.voiceId, language: 'en' },
+          avatar_persona: { voice_id: (!settings.sandbox && voiceId) || settings.voiceId, language: 'en' },
         }),
       });
       if (!response.ok) throw new LiveAvatarError(`LiveAvatar token request failed with ${response.status}`);
