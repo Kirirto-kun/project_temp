@@ -20,7 +20,9 @@ export interface ServerEnv {
   allowInsecureCookies: boolean;
   anthropicKey: string | null;
   llmProvider: string;
-  elevenlabs: { apiKey: string; agentId: string | null; customLlmSecret: string | null; sttModel: string; voiceMap: Record<string, string> } | null;
+  elevenlabs: { apiKey: string; agentId: string | null; customLlmSecret: string | null; sttModel: string; ttsModel: string; voiceMap: Record<string, string> } | null;
+  /** Dictation and read-aloud in the text chats (ElevenLabs Scribe + TTS). On with an ElevenLabs key unless TEXT_CHAT_SPEECH=off. */
+  textChatSpeech: boolean;
   openaiRealtime: { apiKey: string; model: string; voice: string } | null;
   /** Opt-in on-device body-language step (MediaPipe in the browser). Off unless VISUAL_INTAKE=1. */
   visualIntake: boolean;
@@ -34,6 +36,8 @@ export interface ServerEnv {
   intakeMessagesPerIpPerDay: number;
   voiceBaselinesPerIpPerDay: number;
   audioUploadsPerIpPerDay: number;
+  speechInputsPerIpPerDay: number;
+  speechOutputsPerIpPerDay: number;
   demoPool: { token: string; sessions: number } | null;
 }
 
@@ -125,9 +129,11 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
           agentId: str(env.ELEVENLABS_AGENT_ID),
           customLlmSecret: str(env.ELEVENLABS_CUSTOM_LLM_SECRET),
           sttModel: str(env.ELEVENLABS_STT_MODEL) ?? 'scribe_v3',
+          ttsModel: str(env.ELEVENLABS_TTS_MODEL) ?? 'eleven_flash_v2_5',
           voiceMap: parseVoiceMap(str(env.ELEVENLABS_VOICE_MAP)),
         }
       : null,
+    textChatSpeech: str(env.TEXT_CHAT_SPEECH)?.toLowerCase() !== 'off',
     openaiRealtime: openaiKey && realtimeModel ? { apiKey: openaiKey, model: realtimeModel, voice: str(env.OPENAI_REALTIME_VOICE) ?? 'marin' } : null,
     liveAvatar: readLiveAvatar(env, isProduction),
     s3:
@@ -144,6 +150,8 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
     intakeMessagesPerIpPerDay: int(env.INTAKE_MESSAGES_PER_IP_PER_DAY, 2000),
     voiceBaselinesPerIpPerDay: int(env.VOICE_BASELINES_PER_IP_PER_DAY, 6),
     audioUploadsPerIpPerDay: int(env.AUDIO_UPLOADS_PER_IP_PER_DAY, 20),
+    speechInputsPerIpPerDay: int(env.SPEECH_INPUTS_PER_IP_PER_DAY, 60),
+    speechOutputsPerIpPerDay: int(env.SPEECH_OUTPUTS_PER_IP_PER_DAY, 200),
     demoPool: demoToken && demoToken.length >= 12 ? { token: demoToken, sessions: int(env.DEMO_POOL_SESSIONS, 10) } : null,
   };
 }

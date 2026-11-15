@@ -16,6 +16,8 @@ export const COST_ESTIMATES = {
   realtimePerMinute: 300_000,
   /** LiveAvatar LITE minute plus the ElevenLabs agent minute; conservative until measured. */
   avatarPerMinute: 300_000,
+  /** Text-to-speech per character of read-aloud text; conservative upper bound until measured. */
+  ttsPerChar: 300,
 } as const;
 
 /** Token prices in micro-USD per token (from Anthropic's published per-million rates). */
@@ -25,7 +27,7 @@ export const TOKEN_PRICES: Record<string, { input: number; output: number }> = {
   'claude-sonnet-5-5': { input: 2, output: 10 },
 };
 
-export type BudgetCategory = 'llm' | 'scribe' | 'agents' | 'realtime' | 'avatar';
+export type BudgetCategory = 'llm' | 'scribe' | 'agents' | 'realtime' | 'avatar' | 'tts';
 
 export interface Reservation {
   id: string;
@@ -46,7 +48,7 @@ export class Budget {
   }
 
   /** Atomically reserves an upper-bound cost; rejects when the daily ceiling would be exceeded. */
-  async reserve(category: BudgetCategory, micros: number): Promise<Reservation> {
+  async reserve<C extends BudgetCategory>(category: C, micros: number): Promise<Reservation & { category: C }> {
     const day = utcDay(this.now());
     const amount = Math.max(0, Math.ceil(micros));
     if (this.dailyCeilingMicros !== null) {
