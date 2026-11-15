@@ -116,6 +116,9 @@ export function applyMove(config: ScenarioConfig, state: CoreState, move: Move):
       if (clearFirstMatching(config, draft, 'justify')) {
         draft.trust += 2;
         action = concedeAction(config, draft, draft.userLastMinor, step);
+      } else if (draft.userLastMinor !== null) {
+        // Nothing left to clear: a further reason earns half a step (whole dollars) toward the standing ask.
+        action = concedeAction(config, draft, draft.userLastMinor, Math.max(100, Math.floor(step / 200) * 100));
       } else {
         action = { kind: 'hold' };
       }
