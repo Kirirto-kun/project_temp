@@ -25,16 +25,22 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.8.0",
+    "@base-ui/react": "1.9.0",
     "@elevenlabs/client": "1.36.1",
     "@elevenlabs/react": "1.22.1",
     "@mediapipe/tasks-vision": "1.1.1",
+    "@number-flow/react": "0.6.2",
     "clsx": "2.1.1",
     "lucide-react": "1.73.0",
+    "motion": "14.8.0",
     "next": "16.4.6",
     "pitchfinder": "2.3.4",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "server-only": "0.0.1",
+    "sonner": "2.0.8",
+    "tailwind-merge": "3.7.0",
+    "vaul": "1.1.2",
     "zod": "4.6.7"
   },
   "devDependencies": {

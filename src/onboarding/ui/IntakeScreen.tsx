@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ApiClientError } from '@/client/api/client';
+import { ScreenSkeleton } from '@/components/ui/skeleton';
 import type { IntakeView } from '../contracts';
 import { getIntake } from '../client/api';
 import { AudioCoach } from './AudioCoach';
@@ -23,10 +24,11 @@ export function IntakeScreen({ id }: { id: string }) {
 
   if (error) {
     return (
-      <div className="grid gap-4">
-        <h1 className="h-screen m-0">Session not found</h1>
+      <div className="mx-auto grid max-w-[560px] justify-items-start gap-4">
+        <p className="eyebrow m-0">Coach</p>
+        <h1 className="h-title m-0">Session not found</h1>
         <p className="m-0 text-muted">{error}</p>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Link href="/intake" className="btn btn-primary">
             Start again
           </Link>
@@ -37,13 +39,13 @@ export function IntakeScreen({ id }: { id: string }) {
       </div>
     );
   }
-  if (!view) return <p className="text-muted">Loading…</p>;
+  if (!view) return <ScreenSkeleton variant="chat" />;
 
   const reviewing = view.phase === 'review' || view.phase === 'completed';
   return (
     <div className="grid gap-4">
       {notice && (
-        <p className="m-0 rounded-[8px] bg-hold-tint p-3 text-[14px]" role="status">
+        <p className="callout pop-in m-0" role="status">
           {notice}
         </p>
       )}

@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: 'Choose your counterpart' };
 
 export default function OpponentsPage() {
   return (
-    <Page theme="light" minimalHeader>
+    <Page minimalHeader>
       <OpponentPicker />
     </Page>
   );

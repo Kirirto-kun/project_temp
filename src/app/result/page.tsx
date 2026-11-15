@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: 'Your round' };
 
 export default function ResultPage() {
   return (
-    <Page theme="light" minimalHeader>
+    <Page minimalHeader>
       <ResultView />
     </Page>
   );

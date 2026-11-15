@@ -1,34 +1,45 @@
 'use client';
 
+import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { StandardKind } from '@/contracts/domain';
 import { Avatar } from '@/components/holdline/Avatar';
+import { ScreenSkeleton } from '@/components/ui/skeleton';
 import { ARCHETYPE_LABELS, AVATAR_CARDS } from '@/content/avatars';
 import { useDraft } from './useDraft';
 
 export function OpponentPicker() {
   const router = useRouter();
   const [state, setState] = useDraft();
-  if (!state) return <p className="text-muted">Loading…</p>;
+  if (!state) return <ScreenSkeleton />;
   const kind = state.draft.kind as StandardKind | undefined;
   if (!kind || kind === ('custom' as string)) {
     return (
-      <p>
-        Set up the round first: <Link href="/quiz">quick form</Link> or <Link href="/intake">coach</Link>.
-      </p>
+      <div className="mx-auto grid max-w-[560px] justify-items-start gap-4">
+        <h1 className="h-title m-0">Set up the round first</h1>
+        <p className="m-0 text-muted">The counterpart depends on what you are negotiating.</p>
+        <div className="flex flex-wrap gap-3">
+          <Link href="/quiz" className="btn btn-primary">
+            Quick form
+          </Link>
+          <Link href="/intake" className="btn btn-secondary">
+            Talk to the coach
+          </Link>
+        </div>
+      </div>
     );
   }
   const cards = AVATAR_CARDS.filter((c) => c.kinds.includes(kind));
   return (
-    <div className="grid gap-6">
-      <div>
+    <div className="mx-auto grid max-w-[760px] gap-8">
+      <header className="grid gap-3">
         <p className="eyebrow m-0">Counterpart</p>
-        <h1 className="h-screen m-0 mt-2">Who will you practise against?</h1>
-        <p className="m-0 mt-2 text-[14px] text-muted">Each one says no differently. The numbers come from your range either way.</p>
-      </div>
+        <h1 className="h-title m-0">Who will you practise against?</h1>
+        <p className="m-0 text-[15px] leading-6 text-muted">Each one says no differently. The numbers come from your range either way.</p>
+      </header>
       <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Counterparts">
-        {cards.map((card) => {
+        {cards.map((card, i) => {
           const selected = state.avatarId === card.avatarId;
           return (
             <button
@@ -36,25 +47,28 @@ export function OpponentPicker() {
               type="button"
               role="radio"
               aria-checked={selected}
-              className="option items-start gap-4 p-4"
+              className="option pop-in !items-start gap-4 !p-4 sm:!p-5"
+              style={{ ['--delay' as string]: `${Math.round(120 * (1 - Math.pow(0.7, i)))}ms` }}
               onClick={() => setState({ ...state, avatarId: card.avatarId })}
             >
               <Avatar avatarId={card.avatarId} size={64} />
-              <span className="grid gap-1">
-                <span className="text-[16px] font-semibold">{card.name}</span>
-                <span className="text-[14px] text-muted">
+              <span className="grid min-w-0 gap-1.5">
+                <span className="text-[17px] font-semibold tracking-[-0.015em]">{card.name}</span>
+                <span className="text-[13.5px] leading-5 text-muted">
                   {card.role} · {card.tenure}
                 </span>
-                <span className="label mt-1">{ARCHETYPE_LABELS[card.archetype].title}</span>
-                <span className="text-[14px] font-normal leading-5">{card.style}</span>
+                <span className="badge badge-hold mt-1 w-fit">{ARCHETYPE_LABELS[card.archetype].title}</span>
+                <span className="mt-1 text-[14px] font-normal leading-5 text-ink-soft">{card.style}</span>
               </span>
             </button>
           );
         })}
       </div>
-      <button type="button" className="btn btn-primary btn-xl" disabled={!state.avatarId} onClick={() => router.push('/calibration')}>
-        Continue
-      </button>
+      <div className="funnel-actions">
+        <button type="button" className="btn btn-primary btn-xl !max-w-none sm:!w-full" disabled={!state.avatarId} onClick={() => router.push('/calibration')}>
+          Continue <ArrowRight size={18} strokeWidth={2} className="arrow" aria-hidden />
+        </button>
+      </div>
     </div>
   );
 }

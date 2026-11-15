@@ -8,7 +8,7 @@ free and see, move by move, how much was left on the table against your own rang
 No sign-up, no login. Everything works by typing; voice is optional.
 
 > Business Cup 2.0 project. Plans: [PLAN.md](PLAN.md) and [docs/superpowers/plans](docs/superpowers/plans).
-> Design source of truth: [brandbook.html](brandbook.html) (v2).
+> Design system: [DESIGN.md](DESIGN.md) (white + violet; supersedes the visual rules of [brandbook.html](brandbook.html)).
 > This build deliberately excludes the HeyGen/LiveAvatar video avatar and any body-language model.
 
 ## How it works

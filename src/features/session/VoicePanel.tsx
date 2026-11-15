@@ -1,7 +1,7 @@
 'use client';
 
 import { ConversationProvider, useConversation } from '@elevenlabs/react';
-import { Mic, MicOff, PhoneOff } from 'lucide-react';
+import { Keyboard, Loader2, Mic, MicOff } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { SessionBinding } from '@/contracts/api';
 import type { SessionView } from '@/contracts/domain';
@@ -203,18 +203,26 @@ function VoiceInner({ session, onSession, onTentative, onFallback, onAnalysis }:
 
   if (state === 'idle' || state === 'requesting_permission') {
     return (
-      <div className="card grid gap-3 p-4">
-        <div className="label">Speak instead of typing</div>
-        <p className="m-0 text-[14px] leading-5 text-muted">Your microphone goes to the voice service for the conversation. Recording for the voice debrief is separate and off unless you tick it.</p>
-        <label className="flex items-start gap-3 text-[14px] leading-5">
-          <input type="checkbox" className="mt-0.5 h-5 w-5" checked={recordConsent} onChange={(e) => setRecordConsent(e.target.checked)} />
+      <div className="card grid gap-4 p-5">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-hold-tint text-hold-text">
+            <Mic size={18} strokeWidth={2} aria-hidden />
+          </span>
+          <div className="grid gap-1">
+            <span className="text-[15px] font-semibold tracking-[-0.01em]">Speak instead of typing</span>
+            <span className="text-[13.5px] leading-5 text-muted">Your microphone goes to the voice service for the conversation. Recording for the voice debrief is separate and off unless you tick it.</span>
+          </div>
+        </div>
+        <label className="flex cursor-pointer items-start gap-3 rounded-[14px] bg-paper-subtle p-3 text-[14px] leading-5 shadow-[inset_0_0_0_1px_var(--line)]">
+          <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={recordConsent} onChange={(e) => setRecordConsent(e.target.checked)} />
           Also record my microphone for the voice debrief. Audio is deleted after the analysis, within 24 hours.
         </label>
         <button type="button" className="btn btn-secondary" onClick={() => void start()} disabled={state === 'requesting_permission' || Boolean(session.ended)}>
-          <Mic size={20} strokeWidth={1.5} aria-hidden /> {state === 'requesting_permission' ? 'Waiting for the microphone…' : 'Talk instead'}
+          {state === 'requesting_permission' ? <Loader2 size={18} className="animate-spin" aria-hidden /> : <Mic size={18} strokeWidth={2} aria-hidden />}
+          {state === 'requesting_permission' ? 'Waiting for the microphone…' : 'Talk instead'}
         </button>
         {error && (
-          <p className="m-0 text-[14px] text-gap" role="alert">
+          <p className="callout callout-warn m-0 text-ink" role="alert">
             {error}
           </p>
         )}
@@ -222,29 +230,38 @@ function VoiceInner({ session, onSession, onTentative, onFallback, onAnalysis }:
     );
   }
 
+  const live = state === 'active';
   return (
-    <div className="card grid gap-3 p-4" aria-live="polite">
+    <div className="on-violet grid gap-4 rounded-[24px] p-5" aria-live="polite">
       <div className="flex items-center justify-between gap-3">
-        <span className="label">
-          {state === 'connecting' ? 'Connecting…' : state === 'ending' ? 'Ending…' : state === 'ended' ? 'Voice ended' : conversation.isSpeaking ? 'Counterpart speaking' : 'Listening'}
+        <span className="flex items-center gap-3">
+          <span className="voice-bars" data-active={live && !muted} aria-hidden>
+            <i />
+            <i />
+            <i />
+            <i />
+          </span>
+          <span className="text-[15px] font-semibold">
+            {state === 'connecting' ? 'Connecting…' : state === 'ending' ? 'Ending…' : state === 'ended' ? 'Voice ended' : conversation.isSpeaking ? 'Counterpart speaking' : muted ? 'Muted' : 'Listening'}
+          </span>
         </span>
         {pace !== null && (
-          <span className="mono text-[13px] text-muted" title="Approximate: words of your last reply divided by the time you were speaking. The debrief measures it precisely.">
+          <span className="mono rounded-full bg-white/15 px-2.5 py-1 text-[12.5px]" title="Approximate: words of your last reply divided by the time you were speaking. The debrief measures it precisely.">
             pace ≈ {pace} wpm
           </span>
         )}
       </div>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="btn btn-secondary" onClick={() => setMuted((m) => !m)} disabled={state !== 'active'} aria-pressed={muted}>
-          {muted ? <MicOff size={20} strokeWidth={1.5} aria-hidden /> : <Mic size={20} strokeWidth={1.5} aria-hidden />}
+        <button type="button" className={`btn ${muted ? 'btn-white' : 'hero-ghost'}`} onClick={() => setMuted((m) => !m)} disabled={state !== 'active'} aria-pressed={muted}>
+          {muted ? <MicOff size={18} strokeWidth={2} aria-hidden /> : <Mic size={18} strokeWidth={2} aria-hidden />}
           {muted ? 'Unmute' : 'Mute'}
         </button>
-        <button type="button" className="btn btn-secondary" onClick={() => void backToText()} disabled={state === 'ending' || state === 'ended'}>
-          <PhoneOff size={20} strokeWidth={1.5} aria-hidden /> Switch to typing
+        <button type="button" className="btn hero-ghost" onClick={() => void backToText()} disabled={state === 'ending' || state === 'ended'}>
+          <Keyboard size={18} strokeWidth={2} aria-hidden /> Switch to typing
         </button>
       </div>
       {error && (
-        <p className="m-0 text-[14px] text-gap" role="alert">
+        <p className="m-0 rounded-[12px] bg-white/15 p-3 text-[14px]" role="alert">
           {error}
         </p>
       )}

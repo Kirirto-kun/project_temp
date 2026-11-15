@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: 'Read an offer' };
 
 export default function OfferPage() {
   return (
-    <Page theme="light">
+    <Page>
       <OfferForm />
     </Page>
   );
