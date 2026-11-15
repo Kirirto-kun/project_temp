@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, CameraOff, CircleAlert, Clock, Keyboard, Loader2, Mic } from 'lucide-react';
+import { ArrowRight, Camera, CameraOff, CircleAlert, Clock, Keyboard, Loader2, Mic } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -69,7 +69,7 @@ export function IntakeEntry() {
             {voice ? <Mic size={14} strokeWidth={2} aria-hidden /> : <Keyboard size={14} strokeWidth={2} aria-hidden />} {voice ? 'Speak or type' : 'Type your answers'}
           </li>
           <li className="chip">
-            <CameraOff size={14} strokeWidth={2} aria-hidden /> No camera
+            {caps?.visualIntake ? <Camera size={14} strokeWidth={2} aria-hidden /> : <CameraOff size={14} strokeWidth={2} aria-hidden />} {caps?.visualIntake ? 'Camera optional, on your device' : 'No camera'}
           </li>
         </ul>
         {voice && <p className="m-0 text-[14px] leading-6 text-muted">In a voice call your microphone goes to our speech provider so Alex can answer. You confirm every number on screen afterwards.</p>}

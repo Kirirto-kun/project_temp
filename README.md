@@ -9,7 +9,7 @@ No sign-up, no login. Everything works by typing; voice is optional.
 
 > Business Cup 2.0 project. Plans: [PLAN.md](PLAN.md) and [docs/superpowers/plans](docs/superpowers/plans).
 > Design system: [DESIGN.md](DESIGN.md) (white + violet; supersedes the visual rules of [brandbook.html](brandbook.html)).
-> This build deliberately excludes the HeyGen/LiveAvatar video avatar and any body-language model.
+> This build excludes the HeyGen/LiveAvatar video avatar. Body language is an optional, on-device camera step in the coach review (off unless enabled, see below).
 
 ## How it works
 
@@ -74,6 +74,7 @@ text coach. Add keys to turn on optional capabilities; `GET /api/config` shows w
 | Voice practice | `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, `ELEVENLABS_CUSTOM_LLM_SECRET` |
 | Voice calibration and analysis | `ELEVENLABS_API_KEY` + S3 bucket (or `STORAGE_DRIVER=memory` locally) |
 | Coach audio call | `OPENAI_API_KEY`, `OPENAI_REALTIME_MODEL` |
+| Body language on camera (on-device MediaPipe, nothing uploaded) | `VISUAL_INTAKE=1` and `npm run vision:assets` once |
 | Payments, custom scenario, offer analysis | Polar variables, Redis, `APP_URL` |
 
 In production every paid provider stays off until `DAILY_BUDGET_USD` is set. See

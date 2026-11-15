@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import 'server-only';
 import { after } from 'next/server';
 import { NO_MODEL } from '@/intelligence/ports';
@@ -54,6 +56,12 @@ function schedule(task: () => Promise<void>) {
   }
 }
 
+/** The on-device body-language models and wasm are fetched by `npm run vision:assets` and are not in git. */
+function visionAssetsPresent(): boolean {
+  const base = path.join(process.cwd(), 'public', 'intake');
+  return ['models/pose_landmarker_lite.task', 'models/face_landmarker.task', 'wasm/vision_wasm_internal.js'].every((file) => existsSync(path.join(base, file)));
+}
+
 /** Composition root: the only place that reads the environment and picks implementations. */
 export function getDeps(): PlatformDeps {
   if (singletons.deps) return singletons.deps;
@@ -62,7 +70,7 @@ export function getDeps(): PlatformDeps {
   const kv = (singletons.kv ??= buildKv(env));
   const audio = (singletons.audio ??= buildAudio(env));
   const budget = new Budget(kv, env.dailyBudgetMicros);
-  const capabilities = computeCapabilities(env, { durable: kv.durable, audio: audio !== null });
+  const capabilities = computeCapabilities(env, { durable: kv.durable, audio: audio !== null, visionAssets: env.visualIntake && visionAssetsPresent() });
   const spend = {
     reserve: async (micros: number) => {
       const reservation = await budget.reserve('llm', micros);

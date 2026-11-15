@@ -5,7 +5,7 @@ import type { ServerEnv } from './env';
  * Only capabilities whose whole vertical is configured are advertised. In production, paid
  * providers stay off without a global daily spending ceiling.
  */
-export function computeCapabilities(env: ServerEnv, storage: { durable: boolean; audio: boolean }): Capabilities {
+export function computeCapabilities(env: ServerEnv, storage: { durable: boolean; audio: boolean; visionAssets?: boolean }): Capabilities {
   const spendOk = !env.isProduction || env.dailyBudgetMicros !== null;
   const model = spendOk && env.llmProvider !== 'none' && env.anthropicKey !== null;
   const eleven = env.elevenlabs;
@@ -26,7 +26,8 @@ export function computeCapabilities(env: ServerEnv, storage: { durable: boolean;
     avatarIntake: false,
     coachIntake: true,
     coachVoice: spendOk && env.openaiRealtime !== null,
-    visualIntake: false,
+    // Runs only in the browser; advertised only when switched on and the model files are deployed.
+    visualIntake: env.visualIntake && storage.visionAssets === true,
     modelAssist: model,
   };
 }

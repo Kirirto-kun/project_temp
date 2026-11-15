@@ -12,6 +12,8 @@ export interface ServerEnv {
   llmProvider: string;
   elevenlabs: { apiKey: string; agentId: string | null; customLlmSecret: string | null; sttModel: string; voiceMap: Record<string, string> } | null;
   openaiRealtime: { apiKey: string; model: string; voice: string } | null;
+  /** Opt-in on-device body-language step (MediaPipe in the browser). Off unless VISUAL_INTAKE=1. */
+  visualIntake: boolean;
   s3: { endpoint: string; region: string; bucket: string; accessKeyId: string; secretAccessKey: string } | null;
   polar: { accessToken: string; webhookSecret: string; productId: string; server: 'sandbox' | 'production'; priceMinor: number } | null;
   dailyBudgetMicros: number | null;
@@ -78,6 +80,7 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
     redis,
     allowInsecureCookies: env.HOLDLINE_ALLOW_INSECURE_COOKIES === '1' || !isProduction,
     anthropicKey: str(env.ANTHROPIC_API_KEY),
+    visualIntake: env.VISUAL_INTAKE === '1',
     llmProvider: (str(env.LLM_PROVIDER) ?? 'anthropic').toLowerCase(),
     elevenlabs: elevenKey
       ? {
