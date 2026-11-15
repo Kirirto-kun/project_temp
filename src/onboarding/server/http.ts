@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
-import { ClientEventSchema, ClientToolSchema, ConnectInputSchema, CreateInputSchema, ProfilePatchSchema, StopReasonSchema } from '../contracts';
+import { ClientEventSchema, ClientToolSchema, ClientRespondSchema, ConnectInputSchema, CreateInputSchema, ProfilePatchSchema, StopReasonSchema, type ClientRespond, type CoachReply } from '../contracts';
 import type { CallService } from './service';
 import type { ProfileControl } from './profile-control';
 import { IntakeError } from './errors';
@@ -8,6 +8,7 @@ import { IntakeError } from './errors';
 interface ApiDependencies {
   service:CallService;profile:ProfileControl;origin:string;ownerSecret:string;maintenanceSecret:string;
   callsAvailable():Promise<boolean>;trustedIpHeader?:string;
+  respond?(owner:string,id:string,input:ClientRespond,signal:AbortSignal):Promise<CoachReply>;
 }
 const patchInput=z.object({expectedRevision:z.number().int().nonnegative(),patch:ProfilePatchSchema}).strict();
 const confirmationInput=z.object({expectedRevision:z.number().int().nonnegative()}).strict();
@@ -16,13 +17,13 @@ const hash=(secret:string,value:string)=>createHmac('sha256',secret).update(valu
 function equalSecret(left:string,right:string){
   const a=Buffer.from(left);const b=Buffer.from(right);return a.length===b.length&&a.length>0&&timingSafeEqual(a,b);
 }
-async function jsonBody(request:Request) {
+export async function jsonBody(request:Request,maxBytes=32768) {
   if(!request.headers.get('Content-Type')?.toLowerCase().startsWith('application/json'))throw new IntakeError(400,'INVALID_CONTENT_TYPE','Use a JSON request.');
-  if(Number(request.headers.get('Content-Length'))>32768)throw new IntakeError(413,'BODY_TOO_LARGE','This request is too large.');
+  if(Number(request.headers.get('Content-Length'))>maxBytes)throw new IntakeError(413,'BODY_TOO_LARGE','This request is too large.');
   const reader=request.body?.getReader();if(!reader)throw new IntakeError(400,'INVALID_INPUT','Request body is missing.');
   const chunks:Uint8Array[]=[];let size=0;
   try {
-    while(true){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>32768){await reader.cancel();throw new IntakeError(413,'BODY_TOO_LARGE','This request is too large.');}chunks.push(part.value);}
+    while(true){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>maxBytes){await reader.cancel();throw new IntakeError(413,'BODY_TOO_LARGE','This request is too large.');}chunks.push(part.value);}
     const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
     return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)) as unknown;
   }catch(error){if(error instanceof IntakeError)throw error;throw new IntakeError(400,'INVALID_INPUT','Request body is not valid JSON.');}
@@ -45,7 +46,7 @@ export function createIntakeApi(deps:ApiDependencies) {
         return respond(await deps.service.maintenance(!await deps.callsAvailable(),true));
       }
       if(request.method!=='GET'&&request.headers.get('Origin')!==deps.origin)throw new IntakeError(403,'INVALID_ORIGIN','This request must come from Holdline.');
-      if(path.length===1&&path[0]==='config'&&request.method==='GET')return respond({intakeContractVersion:1,available:await deps.callsAvailable(),sessionLimitSeconds:300,capabilities:{visualAnalysis:false,audioAnalysis:false,audioOnly:false}});
+      if(path.length===1&&path[0]==='config'&&request.method==='GET')return respond({intakeContractVersion:2,available:await deps.callsAvailable(),sessionLimitSeconds:deps.service.sessionLimitSeconds,capabilities:{visualAnalysis:false,audioAnalysis:false,audioOnly:false}});
       const cookie=request.headers.get('Cookie')?.split(';').map(c=>c.trim()).find(c=>c.startsWith('holdline_owner='))?.slice('holdline_owner='.length);
       let ownerToken=cookie&&/^[A-Za-z0-9_-]{43}$/.test(cookie)?cookie:null;
       if(path.length===0&&request.method==='POST') {
@@ -84,6 +85,11 @@ export function createIntakeApi(deps:ApiDependencies) {
         return respond(await deps.profile.event(owner,id,input));
       }
       if(action==='tools'&&request.method==='POST')return respond(await deps.profile.tool(owner,id,ClientToolSchema.parse(await jsonBody(request))));
+      if(action==='respond'&&request.method==='POST'){
+        const input=ClientRespondSchema.parse(await jsonBody(request));await deps.service.load(id,owner);
+        if(!deps.respond||!await deps.callsAvailable())throw new IntakeError(503,'CALLS_UNAVAILABLE','The voice conversation is not available. You can use the form.',true);
+        return respond(await deps.respond(owner,id,input,request.signal));
+      }
       throw new IntakeError(404,'NOT_FOUND','Endpoint not found.');
     } catch(error) {
       const known=error instanceof IntakeError?error:error instanceof z.ZodError?new IntakeError(400,'INVALID_INPUT','Check the request fields and amounts.'):new IntakeError(503,'SERVICE_UNAVAILABLE','Your connection could not be completed. Please try again.',true);

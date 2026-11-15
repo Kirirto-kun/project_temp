@@ -19,15 +19,15 @@ export function IntakeEntry({formOnly=false}:{formOnly?:boolean}) {
   }
   return <><Brand/><main className="entry-layout">
     <section className="entry-copy"><div className="eyebrow"><span className="tiny-line"/>01 / A CLEARER ASK</div>
-      <h1>Prepare for your next money conversation<span className="accent">.</span></h1>
-      <p className="entry-description">Tell me about your role and what you want to ask for. We’ll build your practice together.</p>
-      <div className="entry-facts"><span><Clock3 size={16} aria-hidden="true"/>About 3–4 minutes</span><span><Camera size={16} aria-hidden="true"/>Camera optional</span></div>
+      <h1>Prepare for your next conversation<span className="accent">.</span></h1>
+      <p className="entry-description">An interview, a difficult conversation, feedback, or a presentation. Tell me what’s happening and what you want to achieve.</p>
+      <div className="entry-facts"><span><Clock3 size={16} aria-hidden="true"/>Short guided preparation</span><span><Camera size={16} aria-hidden="true"/>Camera optional</span></div>
       <div className="entry-actions"><Button variant="primary" disabled={busy||checking} onClick={()=>void begin(formOnly||!available)}>{busy?'Opening your brief…':formOnly||!available?'Use the quick form':'Start the conversation'}<ArrowRight size={18} aria-hidden="true"/></Button>
         {!formOnly?<Button variant="quiet" disabled={busy||checking} onClick={()=>void begin(available)}>{available?'Use the quick form':'Preview call setup'}<ArrowRight size={16} aria-hidden="true"/></Button>:null}</div>
       <p className="small muted">No sign-up. No camera recording.</p>
       {!checking&&!available?<p className="availability-note">Video conversations are being set up. Your practice brief is available in the quick form.</p>:null}
       {error?<p role="alert" className="notice notice-error">{error}</p>:null}
-      <div className="entry-steps">{[['01','Set the context','Your role. Your conversation. Your goal.'],['02','Say the first sentence','A short opening, in your own words.'],['03','Check your practice brief','You check the numbers before moving on.']].map(([n,title,text])=><div className="entry-step" key={n}><span className="step-number">{n}</span><div><h2>{title}</h2><p>{text}</p></div><Check size={16} aria-hidden="true"/></div>)}</div>
+      <div className="entry-steps">{[['01','Set the context','Your role. Your conversation. Your goal.'],['02','Say the first sentence','A short opening, in your own words.'],['03','Check your practice brief','Review the situation and the outcome you want.']].map(([n,title,text])=><div className="entry-step" key={n}><span className="step-number">{n}</span><div><h2>{title}</h2><p>{text}</p></div><Check size={16} aria-hidden="true"/></div>)}</div>
     </section>
     <aside className="entry-visual"><div className="preview-topline"><span className="eyebrow">YOUR PRACTICE COACH</span><span className="ai-badge">AI</span></div><div className="poster-frame"><CoachPoster/><div className="poster-label"><AudioLines size={18} aria-hidden="true"/><div><strong>Alex</strong><span>AI practice coach · illustrated preview</span></div></div></div><div className="coach-note"><span className="label">A MOMENT TO PREPARE</span><p>“We’ll work out what you want to say.<br/>Then you can try saying it.”</p></div></aside>
   </main><footer className="site-footer"><span>Hold your line.</span><span>A practice conversation. You make the decisions.</span></footer></>;

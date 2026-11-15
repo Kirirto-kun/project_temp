@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { ConnectInput, Connection, CreateInput, IntakeView, Mode, Profile, StopReason, TranscriptItem } from '../contracts';
 import type { IntakeStore } from './store';
 import type { BudgetPort } from './budget';
-import { conflict, IntakeError } from './errors';
+import { checkCancellation, conflict, IntakeError } from './errors';
 
 export interface Attempt {
   epoch: number; mode: Mode; clientId: string; deadlineAt: string;
@@ -16,12 +16,14 @@ export interface CallProvider {
   credentials(attempt: Attempt): Promise<{ sessionToken: string }>;
 }
 interface Receipt { fingerprint: string; epoch?: number }
+export interface CoachTurnReceipt {serial:number;profileRevision:number;inputGeneration?:number;state:'processing'|'ready'|'failed';reply?:string}
 export interface IntakeRecord {
   id: string; ownerId: string; revision: number; profileRevision: number;
   phase: IntakeView['phase']; mediaStatus: IntakeView['mediaStatus']; mode: Mode;
   profile: Profile; confirmedAt: string | null; transcript: TranscriptItem[];
   createdAt: string; expiresAt: string; attempt: Attempt | null;
   receipts: Record<string, Receipt>; clientEvents: string[]; deleted: boolean;
+  coachTurns?:Record<string,CoachTurnReceipt>;latestCoachTurn?:string|null;coachSerial?:number;coachInputGeneration?:number;
 }
 export const fingerprint = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const emptyProfile = (): Profile => ({});
@@ -38,7 +40,8 @@ export function publicView(record: IntakeRecord): IntakeView {
 
 export class CallService {
   readonly now: () => number;
-  constructor(readonly deps: { store: IntakeStore; provider: CallProvider; budget: BudgetPort; now?: () => number }) { this.now = deps.now ?? Date.now; }
+  constructor(readonly deps: { store: IntakeStore; provider: CallProvider; budget: BudgetPort; now?: () => number; maxSessionSeconds?:number }) { this.now = deps.now ?? Date.now; }
+  get sessionLimitSeconds(){return Math.max(1,Math.min(300,this.deps.maxSessionSeconds??300));}
   private key(id: string) { return 'session:' + id; }
   async load(id: string, ownerId?: string): Promise<IntakeRecord> {
     const record = await this.deps.store.read<IntakeRecord>(this.key(id));
@@ -46,7 +49,8 @@ export class CallService {
     if (record.deleted || Date.parse(record.expiresAt) <= this.now()) throw new IntakeError(410, 'EXPIRED', 'This brief has expired. Start a new conversation.');
     return record;
   }
-  async save(previous: IntakeRecord, next: IntakeRecord) {
+  async save(previous: IntakeRecord, next: IntakeRecord, signal?:AbortSignal) {
+    checkCancellation(signal);
     next.revision = previous.revision + 1;
     return this.deps.store.compareAndSet(this.key(previous.id), previous.revision, next, Math.max(1, (Date.parse(previous.expiresAt) - this.now()) / 1000));
   }
@@ -99,11 +103,12 @@ export class CallService {
     const epoch = (record.attempt?.epoch ?? 0) + 1;
     const attempt: Attempt = {
       epoch, mode: input.mode, clientId: input.clientId,
-      deadlineAt: new Date(this.now() + 300000).toISOString(), provisioned: false,
+      deadlineAt: new Date(this.now() + this.sessionLimitSeconds*1000).toISOString(), provisioned: false,
       providerSessionId: null, credentialCiphertext: null, createdAt: this.now(), lastHeartbeatAt: this.now(),
     };
     const next = structuredClone(record);
     next.attempt = attempt; next.mode = input.mode; next.phase = 'connecting'; next.mediaStatus = 'connecting';
+    next.coachTurns={};next.latestCoachTurn=null;next.coachSerial=0;next.coachInputGeneration=0;
     this.addReceipt(next, key, input, epoch);
     if (!await this.save(record, next)) throw conflict();
     record = next;
@@ -147,6 +152,7 @@ export class CallService {
       const record = await this.deps.store.read<IntakeRecord>(this.key(id));
       if (!record || record.attempt?.epoch !== epoch || record.mediaStatus === 'closed') return;
       const next = structuredClone(record); next.mediaStatus = 'closed'; next.attempt!.credentialCiphertext = null;
+      next.coachTurns={};next.latestCoachTurn=null;
       if (next.phase !== 'completed') next.phase = 'review';
       if (await this.save(record, next)) return;
     }
@@ -188,6 +194,7 @@ export class CallService {
     for (let retry = 0; retry < 32; retry++) {
       const record = await this.load(id, ownerId); const next = structuredClone(record);
       next.deleted = true; next.profile = emptyProfile(); next.transcript = []; next.receipts = {}; next.clientEvents = []; next.confirmedAt = null;
+      next.coachTurns={};next.latestCoachTurn=null;
       if (await this.save(record, next)) return;
     }
     throw conflict();

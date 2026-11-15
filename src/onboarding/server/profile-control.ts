@@ -1,7 +1,6 @@
 import type { ClientEvent, ClientTool, ProfilePatch } from '../contracts';
 import { ProfilePatchSchema } from '../contracts';
-import { QuizAnswersSchema } from '@/contracts/domain';
-import { conflict, IntakeError } from './errors';
+import { checkCancellation, conflict, IntakeError } from './errors';
 import { CallService, fingerprint, publicView, type IntakeRecord } from './service';
 
 export class ProfileControl {
@@ -10,11 +9,13 @@ export class ProfileControl {
     const parsed=ProfilePatchSchema.safeParse(patch);
     if(!parsed.success) throw new IntakeError(400,'INVALID_PROFILE','Check the brief fields and amounts.');
     const profile={...record.profile};
+    if(record.profile.kind!==undefined && parsed.data.kind!==undefined && parsed.data.kind!==record.profile.kind) {
+      for(const field of ['currentMinor','targetMinor','marketLowMinor','marketHighMinor','currency','period','moneyBasis','rangeSource'] as const) delete profile[field];
+    }
     for(const [name,value]of Object.entries(parsed.data)) {
       if(value===null)delete (profile as Record<string,unknown>)[name];
       else if(value!==undefined)(profile as Record<string,unknown>)[name]=value;
     }
-    if(profile.kind && profile.kind!=='raise') throw new IntakeError(400,'UNSUPPORTED_SCENARIO','This coach currently prepares salary-raise conversations.');
     if(['currentMinor','targetMinor','marketLowMinor','marketHighMinor'].some(k=>k in profile) && (!profile.currency||!profile.period||!profile.moneyBasis)) throw new IntakeError(400,'MONEY_UNITS_REQUIRED','Confirm currency, period and gross/net before saving an amount.');
     if(profile.marketLowMinor!==undefined&&profile.marketHighMinor!==undefined&&profile.marketLowMinor>profile.marketHighMinor) throw new IntakeError(400,'INVALID_RANGE','The lower range must not exceed the upper range.');
     const next=structuredClone(record);
@@ -30,8 +31,7 @@ export class ProfileControl {
     return !!prior;
   }
   missing(record:IntakeRecord):string[] {
-    const result=QuizAnswersSchema.safeParse(record.profile);
-    return result.success?[]:[...new Set(result.error.issues.map(i=>String(i.path[0])))];
+    return (['kind','description','goal','counterpartRole'] as const).filter(field=>!record.profile[field]?.trim());
   }
   async patch(owner:string,id:string,key:string,input:{expectedRevision:number;patch:ProfilePatch}) {
     const record=await this.service.load(id,owner);
@@ -61,11 +61,12 @@ export class ProfileControl {
       const record=await this.service.load(id,owner);this.bound(record,input);
       if(record.clientEvents.includes(input.eventId)) return {continue:true,view:publicView(record)};
       const next=structuredClone(record);next.attempt!.lastHeartbeatAt=this.service.now();
+      if(input.type==='speech_started'){next.latestCoachTurn=null;next.coachInputGeneration=(record.coachInputGeneration??0)+1;}
       if(input.type==='ready'){next.mediaStatus='active';if(next.phase==='connecting')next.phase='interviewing';}
       if(input.type==='transcript'){
         if(!input.transcript) throw new IntakeError(400,'INVALID_INPUT','Transcript is missing.');
         const index=next.transcript.findIndex(t=>t.turnId===input.transcript!.turnId);
-        if(index<0) next.transcript=[...next.transcript,input.transcript].slice(-100);
+        if(index<0){next.transcript=[...next.transcript,input.transcript].slice(-100);if(input.transcript.role==='user'){next.latestCoachTurn=null;next.coachInputGeneration=(record.coachInputGeneration??0)+1;}}
         else if(input.transcript.role==='assistant'&&input.transcript.interrupted&&next.transcript[index].role==='assistant') next.transcript[index]=input.transcript;
       }
       next.clientEvents=[...next.clientEvents,input.eventId].slice(-500);
@@ -73,8 +74,8 @@ export class ProfileControl {
     }
     throw conflict();
   }
-  async tool(owner:string,id:string,input:ClientTool) {
-    const record=await this.service.load(id,owner);this.bound(record,input);
+  async tool(owner:string,id:string,input:ClientTool,signal?:AbortSignal) {
+    const record=await this.service.load(id,owner);checkCancellation(signal);this.bound(record,input);
     const key='tool:'+input.callId;
     if(this.replay(record,key,input)) return {view:publicView(record),missingFields:this.missing(record)};
     if(record.revision!==input.expectedRevision)throw conflict(record.revision);
@@ -85,7 +86,8 @@ export class ProfileControl {
     }
     if(input.toolName==='request_mini_practice')next.phase='mini_practice';
     this.service.addReceipt(next,key,input);
-    if(!await this.service.save(record,next))throw conflict();
+    if(!await this.service.save(record,next,signal))throw conflict();
+    checkCancellation(signal);
     if(input.toolName==='prepare_confirmation'||input.toolName==='request_end') {
       const view=await this.service.stop(owner,id,'tool-stop:'+input.callId,'review',input.providerEpoch);
       return {view,missingFields:this.missing(next)};

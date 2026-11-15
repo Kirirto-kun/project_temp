@@ -1,4 +1,4 @@
-import { expect,it } from 'vitest';
+import { expect,it,vi } from 'vitest';
 import { CallController, type CallSession, type CallApi, type SessionCallbacks } from '@/onboarding/client/call';
 import type { Connection,IntakeView } from '@/onboarding/contracts';
 
@@ -6,8 +6,8 @@ const view:IntakeView={id:'id',revision:1,profileRevision:0,phase:'connecting',m
 function fixture() {
   const effects:string[]=[];
   let callbacks!:SessionCallbacks;
-  const api:CallApi={async connect(){effects.push('mint');return{sessionToken:'token',providerEpoch:1,deadlineAt:view.deadlineAt!,view} as Connection;},async event(){return{continue:true,view};},async tool(){return{view,missingFields:[]};},async read(){return view;},async stop(){effects.push('server-stop');return{...view,mediaStatus:'closed',phase:'review'};}};
-  const session:CallSession={async start(){effects.push('start');},async stop(){effects.push('sdk-stop');},releaseMicrophone(){effects.push('release-mic');},async setMuted(muted){effects.push(muted?'mute':'unmute');},attach(){},async keepAlive(){},sendToolResult(){effects.push('tool-result');},sendText(){}};
+  const api:CallApi={async connect(){effects.push('mint');return{sessionToken:'token',providerEpoch:1,deadlineAt:view.deadlineAt!,view} as Connection;},async event(){return{continue:true,view};},async tool(){return{view,missingFields:[]};},async respond(input){effects.push('model-response');return{reply:'Server reply',turnId:input.turnId,providerEpoch:1,view};},async read(){return view;},async stop(){effects.push('server-stop');return{...view,mediaStatus:'closed',phase:'review'};}};
+  const session:CallSession={async start(){effects.push('start');},async stop(){effects.push('sdk-stop');},releaseMicrophone(){effects.push('release-mic');},async setMuted(muted){effects.push(muted?'mute':'unmute');},attach(){},async keepAlive(){},sendToolResult(){effects.push('tool-result');},sendText(){},speak(text){effects.push('speak:'+text);},interrupt(){effects.push('interrupt');}};
   const controller=new CallController(api,async(_token,events)=>{callbacks=events;return session;},{onState(){},onView(){},onCaption(){},onError(){}},'00000000-0000-4000-8000-000000000001');
   return{controller,api,session,effects,events:()=>callbacks};
 }
@@ -44,4 +44,26 @@ it('never rebinds an old tool after End and restart while its profile read was p
 it('does not create another paid attempt when Start is clicked twice',async()=>{
   const f=fixture();await Promise.all([f.controller.start(view),f.controller.start(view)]);await f.controller.end('user');
   expect(f.effects.filter(e=>e==='mint')).toHaveLength(1);
+});
+it('allows a twenty-second provider startup within the bounded attempt instead of cancelling a healthy connection',async()=>{
+ vi.useFakeTimers();const f=fixture();
+ try{
+  let entered!:()=>void;const waiting=new Promise<void>(resolve=>{entered=resolve;});
+  f.session.start=()=>{entered();return new Promise<void>(resolve=>setTimeout(resolve,20000));};
+  const starting=f.controller.start(view);await waiting;await vi.advanceTimersByTimeAsync(20000);await starting;
+  expect(f.controller.state).toBe('connected');expect(f.effects).toContain('unmute');
+ }finally{await f.controller.end('user');vi.useRealTimers();}
+});
+it('requests a model response only after the final user transcript is committed, then speaks it directly',async()=>{
+ const f=fixture();await f.controller.start(view);f.effects.length=0;
+ f.api.event=async input=>{if(input.type==='transcript')f.effects.push('transcript-saved');return{continue:true,view};};
+ f.events().caption('user','I want to prepare a conversation','user-turn');await new Promise<void>(r=>setImmediate(r));
+ expect(f.effects.indexOf('transcript-saved')).toBeLessThan(f.effects.indexOf('model-response'));expect(f.effects).toContain('speak:Server reply');await f.controller.end('user');
+});
+it('interrupts speech and aborts a pending response when the user starts speaking again',async()=>{
+ const f=fixture();await f.controller.start(view);f.effects.length=0;let signal!:AbortSignal;let release!:(value:Awaited<ReturnType<CallApi['respond']>>)=>void;let entered!:()=>void;
+ const started=new Promise<void>(r=>{entered=r;});f.api.respond=async(input,abort)=>{signal=abort;entered();return new Promise(r=>{release=r;});};
+ f.events().caption('user','first answer','user-turn');await started;
+ f.events().speechStarted?.();release({reply:'Stale answer',turnId:'user-turn',providerEpoch:1,view});await new Promise<void>(r=>setImmediate(r));
+ expect(signal.aborted).toBe(true);expect(f.effects).toContain('interrupt');expect(f.effects).not.toContain('speak:Stale answer');expect(f.controller.state).toBe('connected');await f.controller.end('user');
 });

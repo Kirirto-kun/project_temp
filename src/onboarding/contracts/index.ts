@@ -35,9 +35,11 @@ export const ConnectionSchema = z.object({
 export const ClientEventSchema = z.object({
   providerEpoch: z.number().int().positive(), clientId: z.uuid(),
   eventId: z.string().min(1).max(160),
-  type: z.enum(['ready', 'heartbeat', 'transcript']),
+  type: z.enum(['ready', 'heartbeat', 'transcript', 'speech_started']),
   transcript: TranscriptItemSchema.optional(),
 }).strict();
+export const ClientRespondSchema=z.object({providerEpoch:z.number().int().positive(),clientId:z.uuid(),turnId:z.string().min(1).max(160)}).strict();
+export const CoachReplySchema=z.object({reply:z.string().max(1800),turnId:z.string(),providerEpoch:z.number().int(),view:IntakeViewSchema});
 export const ClientToolSchema = z.object({
   providerEpoch: z.number().int().positive(), clientId: z.uuid(),
   callId: z.string().min(1).max(160), expectedRevision: z.number().int().nonnegative(),
@@ -56,3 +58,5 @@ export type StopReason = z.infer<typeof StopReasonSchema>;
 export type TranscriptItem = z.infer<typeof TranscriptItemSchema>;
 export type ClientEvent = z.infer<typeof ClientEventSchema>;
 export type ClientTool = z.infer<typeof ClientToolSchema>;
+export type ClientRespond = z.infer<typeof ClientRespondSchema>;
+export type CoachReply = z.infer<typeof CoachReplySchema>;

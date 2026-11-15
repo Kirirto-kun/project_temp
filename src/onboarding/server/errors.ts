@@ -4,3 +4,6 @@ export class IntakeError extends Error {
   }
 }
 export const conflict = (revision?: number) => new IntakeError(409, 'REVISION_CONFLICT', 'This brief has changed. Refresh and try again.', true, revision);
+export function checkCancellation(signal?:AbortSignal) {
+  if(signal?.aborted)throw new IntakeError(410,'CALL_CANCELLED','This response was cancelled.');
+}

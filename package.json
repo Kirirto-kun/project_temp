@@ -8,8 +8,7 @@
   },
   "scripts": {
     "setup:local": "node scripts/setup-local.mjs",
-    "provider:register-secret": "node --env-file-if-exists=.env.local --import tsx scripts/register-elevenlabs-secret.ts",
-    "agent:export-tools": "tsx scripts/export-agent-tools.ts",
+    "provider:configure": "tsx scripts/configure-liveavatar.ts",
     "calls:enable": "node --env-file-if-exists=.env.local --import tsx scripts/call-flag.ts",
     "calls:disable": "node --env-file-if-exists=.env.local --import tsx scripts/call-flag.ts --off",
     "db:up": "docker compose --env-file .env.local up -d postgres",

@@ -1,161 +1,146 @@
-# Настройка видеоаватара: шаг за шагом
+# Настройка универсального видеокоуча
 
-Схема: **наш веб-интерфейс → LiveAvatar LITE → коннектор ElevenLabs → Agent «Коуч»**. Комнату обслуживает LiveAvatar. Для этой части не нужны GPT Realtime, OpenAI API key, свой LiveKit-проект, Python или отдельный Redis.
+Схема: **LiveAvatar FULL ASR event → owner API /respond → внутренний подписанный callback → OpenAI Chat API или Anthropic → reply → SDK.repeat; голос — ElevenLabs TTS через LiveAvatar**. LiveAvatar обслуживает ASR, turn-taking, комнату, медиа и lip sync. ElevenLabs Agent и dashboard tools не нужны. GPT Realtime, свой LiveKit/Python/Redis не используются.
 
-Код и локальная PostgreSQL на этом компьютере подготовлены. Самостоятельно вам нужны аккаунты, оплата сервисов, выбранный персонаж и их API-доступы. Реальный звонок нельзя проверить без этих внешних настроек. Не присылайте ключи в чат и не добавляйте их в Git.
+Коуч готовит любой разговор: интервью, feedback, конфликт, отношения, презентацию или собственную тему. Зарплата/рынок не нужны для обычного brief. Это знакомство и короткая проба вступления; отдельные полноценные roleplay/debrief ещё не объявлены реализованными.
 
-## 1. Создать аккаунт LiveAvatar
+## 1. Проверить локальную установку
 
-1. Откройте [app.liveavatar.com](https://app.liveavatar.com/). LiveAvatar — отдельный продукт; обычная подписка на видеоредактор HeyGen не заменяет автоматически нужный API-доступ.
-2. Проверьте доступ к API и LITE-кредитам/лимитам сессий. Для custom avatar может потребоваться платный план. Конкретный тариф и доступные опции смотрите в своём аккаунте.
-3. Откройте [Developers](https://app.liveavatar.com/developers), создайте/скопируйте API key.
-4. В локальном `.env.local` заполните только значение:
-
-   ```dotenv
-   LIVEAVATAR_API_KEY=ваш_ключ
-   ```
-
-Страница ключа указана в [официальной инструкции LiveAvatar](https://docs.liveavatar.com/docs/faq/api-key.md).
-
-## 2. Подготовить иллюстрированного персонажа
-
-1. Выберите разрешённого стилизованного персонажа либо создайте custom avatar в стиле брендбука. Фотореалистичного stock-коуча для продукта не используем.
-2. Если делаете своего: выполните [процедуру HeyGen для custom/non-human avatar](https://help.heygen.com/en/articles/10035615-how-to-get-started-with-liveavatar). В зависимости от варианта нужны подготовленное видео/consent и ручная проверка; обычная PNG не становится готовым live avatar автоматически.
-3. Дождитесь готового/одобренного аватара и найдите его **avatar ID** в кабинете.
-4. Добавьте:
-
-   ```dotenv
-   LIVEAVATAR_AVATAR_ID=идентификатор_готового_аватара
-   ```
-
-Нарисованный Alex в нашем интерфейсе — локальный **постер предпросмотра**. Он не является уже загруженным и обученным аватаром HeyGen. Готовность этого asset нужно закрыть отдельно.
-
-## 3. Создать ElevenLabs account с нужным доступом
-
-1. Зарегистрируйтесь в [ElevenLabs](https://elevenlabs.io/).
-2. Подключите **платный план**, позволяющий стороннее использование API. Free-tier ключи не работают с этим коннектором.
-3. Создайте отдельный API key с разрешениями `convai_read`, `user_read`, `voices_read`.
-4. Для одноразовой регистрации коннектора заполните в `.env.local`:
-
-   ```dotenv
-   ELEVENLABS_API_KEY=ваш_ключ_elevenlabs
-   ```
-
-Это требование и PCM-формат описаны в [документации коннектора](https://docs.liveavatar.com/docs/lite-mode/connectors/elevenlabs-agent.md).
-
-## 4. Создать Agent «Holdline Coach»
-
-1. В ElevenLabs откройте **Agents** и создайте отдельного агента с именем `Holdline Coach`.
-2. Выберите английский язык и спокойный разборчивый голос. В первой версии продукт работает на английском и с USD.
-3. В выборе LLM используйте поддерживаемую качественную модель для диалога/tools, например доступный в аккаунте Claude Sonnet. Это обычная модель внутри ElevenLabs; GPT Realtime не подключаем. Запишите точное название выбранной модели для проверки.
-4. Вставьте system prompt и первое сообщение из [coach-prompt.md](coach-prompt.md).
-5. В аудионастройках выставьте output format **PCM 24K / pcm_24000**. Настройки именно conversational agent, не MP3-генерации речи.
-6. Включите перебивания пользователя и спокойное ожидание пауз. Точные turn-taking параметры подбираются живым тестом, не обещаются универсальными.
-7. Найдите **Agent ID**, добавьте:
-
-   ```dotenv
-   ELEVENLABS_COACH_AGENT_ID=идентификатор_агента
-   ```
-
-Не запускайте дополнительно ElevenLabs widget в нашем окне звонка: иначе появятся два разговорных соединения и двойной звук.
-
-## 5. Добавить client tools агенту
-
-1. Откройте **Tools → Add tool → Client**.
-2. Добавьте `save_profile` с точным регистром и включите **Wait for response**.
-3. Схема параметров находится в [agent-tools.json](agent-tools.json). Параметр верхнего уровня — объект `patch`; внутри поля общего QuizAnswers, например userRole/currentMinor/targetMinor/currency/period/moneyBasis/description.
-4. Добавьте остальные инструменты из того же файла: `get_missing_fields`, `request_mini_practice`, `prepare_confirmation`, `request_end`. У них пустой объект параметров и включено ожидание ответа.
-5. Эти инструменты уже обработаны нашим клиентом. Они вызывают наш API с owner/revision/epoch, не подключают браузер к PostgreSQL.
-
-Пример параметров `save_profile`:
-
-```json
-{
-  "patch": {
-    "userRole": "Backend engineer",
-    "counterpartRole": "My manager",
-    "kind": "raise",
-    "currentMinor": 9500000,
-    "targetMinor": 11000000,
-    "currency": "USD",
-    "period": "year",
-    "moneyBasis": "gross",
-    "inputMode": "personal"
-  }
-}
-```
-
-Это $95,000 и $110,000, а не 95/110 долларов. До нажатия пользователем Confirm данные остаются кандидатами. Детали [ElevenLabs client tools](https://elevenlabs.io/docs/eleven-agents/customization/tools/client-tools).
-
-## 6. Зарегистрировать ElevenLabs key в LiveAvatar
-
-После заполнения двух API keys в `.env.local` выполните из корня проекта:
-
-```powershell
-npm run provider:register-secret
-```
-
-Команда передаст ElevenLabs key в secret store LiveAvatar, не выведет его значение и вернёт reference ID. Это явная настройка интеграции вашего аккаунта. Добавьте выданный ID:
-
-```dotenv
-LIVEAVATAR_ELEVENLABS_SECRET_ID=выданный_reference_id
-```
-
-Повторно запускать регистрацию каждый раз не нужно. Наш сервер использует inline `elevenlabs_agent_config`, поэтому **отдельно создавать FULL-mode voice agent в LiveAvatar не требуется**. Используется LITE connector. Session variables intake_id/provider_epoch задаёт код; никаких зарплат в них нет.
-
-## 7. Проверить локальную базу и приложение
-
-Для чистой установки:
-
-```powershell
+~~~powershell
 npm ci
 npm run setup:local
 npm run db:up
 npm run db:migrate
 npm run dev
-```
+~~~
 
-`setup:local` создаёт `.env.local` по `.env.example` со случайными локальными DB/auth/encryption secrets, если файла ещё нет. При повторном запуске добавляет только отсутствующие поля, включая `ELEVENLABS_API_KEY`; уже заполненные и пустые значения сохраняет. После обновления кода можно безопасно повторить команду. На этом компьютере локальная база уже поднята; не заменяйте её готовый `.env.local` пустым шаблоном. Каждая переменная — на отдельной строке, без `\` в конце. Сохраните файл в редакторе перед выполнением команд.
+setup:local создаёт игнорируемый .env.local по .env.example с локальными DB/auth/encryption secrets, если файла нет. При повторе добавляет отсутствующие поля, сохраняя существующие значения, комментарии и custom settings. Не заменяйте настроенный файл пустым шаблоном. Каждая переменная — отдельная строка; сохраните файл в редакторе перед запуском команды.
 
-`npm run dev` запускает веб-приложение **и cleanup-процесс**. Нужен работающий Docker для локальной PostgreSQL. Откройте [localhost:3000](http://localhost:3000). Для чужого устройства нужен HTTPS URL; обычный HTTP по LAN не подходит для разрешений камеры/микрофона.
+dev запускает Next.js и независимый cleanup. Для локальной PostgreSQL нужен Docker; по умолчанию откройте [localhost:3000](http://localhost:3000). Форма работает без provider keys. Если используете существующую PostgreSQL вместо контейнера, задайте серверный DATABASE_URL и примените аддитивную миграцию holdline_intake. Другие таблицы приложения не меняются.
 
-Если используете вашу существующую PostgreSQL вместо локального контейнера, замените серверный `DATABASE_URL` и примените миграцию. Она добавляет только схему `holdline_intake` и не меняет таблицы основного продукта. Пароль БД не должен попадать в клиентский код.
+## 2. Проверить LiveAvatar и персонажа
 
-## 8. Разрешить настоящие звонки
+Откройте [LiveAvatar](https://app.liveavatar.com/) и его [Developers](https://app.liveavatar.com/developers). Для проверенного 15 ноября аккаунта подтверждены API-доступ, 10 credits, ACTIVE avatar, одна одновременная сессия и предел Free 120s. Это снимок аккаунта, не обещание будущих тарифов. Для настройки не требуется покупать план или включать overage.
 
-1. Проверьте четыре значения: LIVEAVATAR_API_KEY, LIVEAVATAR_AVATAR_ID, LIVEAVATAR_ELEVENLABS_SECRET_ID, ELEVENLABS_COACH_AGENT_ID.
-2. Установите в `.env.local`:
+В .env.local нужны LIVEAVATAR_API_KEY и LIVEAVATAR_AVATAR_ID. Не отправляйте ключи в чат, не выводите их в логи и не коммитьте файл.
 
-   ```dotenv
-   AVATAR_INTAKE_ENABLED=true
-   ```
+Продуктовый коуч должен быть разрешённым иллюстрированным/стилизованным персонажем брендбука. Custom/non-human asset может требовать [подготовленного видео и проверки HeyGen](https://help.heygen.com/en/articles/10035615-how-to-get-started-with-liveavatar). ACTIVE у API-asset не доказывает соответствие нашему бренду. Нарисованный Alex в интерфейсе — локальный постер, не загруженный автоматически live avatar.
 
-3. Задайте расходные ограничения осознанно: `INTAKE_DAILY_BUDGET_CENTS`, `INTAKE_ATTEMPT_RESERVE_CENTS`, `INTAKE_MAX_CONCURRENCY`. Значения — наши бюджетные резервы в центах USD, **не обещанная цена поставщиков**. Резерв должен покрывать худшую допустимую попытку по вашему тарифу; до измерения расходы не возвращаем автоматически.
-4. Выполните `npm run calls:enable`, перезапустите `npm run dev` и подождите один проход cleanup.
-5. Обновите страницу. До выполнения этих условий приложение честно оставляет видеозвонок выключенным; форма работает отдельно.
+LIVEAVATAR_SANDBOX=true использует designated Wayne только для технического sandbox-теста до 60s без LiveAvatar credits. Это не разрешение показывать Wayne как продуктового коуча. ElevenLabs/model API могут тарифицироваться отдельно.
 
-На каждую попытку действуют серверные 300 секунд, отдельная квота до 3 попыток/IP/UTC-день и глобальный бюджет. Повтор активного запроса не создаёт вторую платную попытку.
+## 3. Подготовить API keys моделей и голоса
 
-## 9. Пройти первый живой тест
+На этом аккаунте ключи уже подтвердили HTTP 200; ElevenLabs paid subscription действительна. Это не означает, что живой звонок принят. При самостоятельной настройке нужны:
 
-1. Откройте страницу, убедитесь, что до Start нет звука/доступа к устройствам/платной сессии.
-2. Start → Check microphone. Разрешите микрофон. Камеру сначала оставьте выключенной.
-3. Connect to Alex. Проверьте одну дорожку голоса, совпадение губ и звука, понятные субтитры.
-4. Скажите: “I am a backend engineer. My current annual base salary is ninety-five thousand US dollars, before tax. I want to ask for one hundred and ten thousand.”
-5. Проверьте карточку: $95,000 → $110,000, USD/year/gross; до вашего клика она не confirmed.
-6. Перебейте коуча и исправьте число. Старый хвост ответа не должен продолжать звучать; неверный кандидат исправьте в brief.
-7. End: звук и микрофон должны остановиться, данные сохраниться, сессия у LiveAvatar завершиться.
-8. Обновите страницу: brief восстанавливается, устройства сами не включаются.
-9. Повторите с запрещённым микрофоном, камерой on/off, отключением сети, закрытием вкладки и двумя вкладками. Проверьте кабинет провайдера и фактические списания.
-10. Пройдите desktop Chrome, реальный Safari/iPhone и нужную вам сеть. Offline/E2E-проверки не заменяют эту приёмку.
+| Переменная | Назначение |
+|---|---|
+| ELEVENLABS_API_KEY | Доступ к TTS-голосу и регистрация secret в LiveAvatar |
+| ELEVENLABS_VOICE_ID | Необязательный исходный voice ID; helper выберет premade voice, если поле пустое |
+| OPENAI_API_KEY | Обычный OpenAI Chat Completions API |
+| ANTHROPIC_API_KEY | Прямой Anthropic Messages API |
 
-Для аварийного выключения новых звонков: `npm run calls:disable`. Cleanup закроет оставшиеся попытки на следующем проходе; при сбое провайдера он повторяет stop, а provider duration дополнительно ограничивает звонок.
+Достаточно одного model API key. Если настроены оба, INTAKE_MODEL_PROVIDER задаёт основной; сервер может использовать второй настроенный provider при ошибке. Ограничения и счета OpenAI/Anthropic/ElevenLabs независимы от LiveAvatar.
 
-## 10. Что потребуется перед публикацией
+Не создавайте ElevenLabs conversational Agent, не добавляйте Agent ID, client tools, widget или второе голосовое соединение.
 
-- HTTPS адрес сервиса и `APP_ORIGIN` с этим точным origin.
-- Рабочая PostgreSQL, миграция, secrets сервера и постоянно работающий cleanup. В production запускать контейнерный сервис по runbook, а не короткую serverless-функцию, которой поручили весь звонок.
-- Настройки retention в ElevenLabs/LiveAvatar: отсутствие raw audio у нас не означает автоматическое отсутствие копий у провайдеров. Проверьте доступные controls своего плана.
-- Если сервис стоит за прокси, прокси должен удалять входящий IP header и выставлять проверенный `x-real-ip` или `cf-connecting-ip`; затем настроить TRUSTED_IP_HEADER. Без этого действует консервативная общая IP-квота.
+## 4. Выбрать модель
 
-Agent «Собеседник», custom LLM движка переговоров, Scribe-анализ, MediaPipe и pitchfinder — следующие интеграции основного продукта. Для первого работающего видеознакомства их отдельно настраивать сейчас не требуется.
+~~~dotenv
+INTAKE_MODEL_PROVIDER=anthropic
+ANTHROPIC_COACH_MODEL=claude-sonnet-5-5
+OPENAI_COACH_MODEL=gpt-5.4-mini
+~~~
+
+Допустимы anthropic и openai. На вымышленном нефинансовом запросе реальные генерации обеих указанных моделей прошли. Это подтверждает текстовый model adapter; голос/липсинк/перебивания проверяются отдельно.
+
+Каноническая логика — COACH_SYSTEM_PROMPT в src/onboarding/server/coach-model.ts; описание и wire format в [coach-prompt.md](coach-prompt.md). Копировать prompt в ElevenLabs dashboard не требуется.
+
+## 5. Проверить серверный режим без внешнего callback
+
+Текущий LiveAvatar FULL token не содержит provider context или vendor LLM configuration. LiveAvatar даёт managed ASR и медиа; наш браузерный controller сохраняет финальную реплику через owner-authenticated API, затем вызывает POST /api/intake/:id/respond.
+
+Сервер проверяет owner/Origin/client/epoch/latest turn, загружает свой transcript и вызывает существующий callback handler внутри процесса. Bearer + HMAC intake/epoch/deadline остаются обязательными, как и PostgreSQL receipts, bounded model calls и защита от late writes. Клиент получает только reply/view и вызывает SDK.repeat. Speech start прерывает SDK и отменяет/инвалидирует предыдущий ответ.
+
+APP_ORIGIN — точный канонический UI origin, локально обычно http://localhost:3000. Внешний callback URL, tunnel, отдельный proxy и ручная provider LLM configuration не нужны. Protected callback route может оставаться для будущего server-to-server использования, но LiveAvatar не обязан его вызывать в текущем режиме.
+
+CUSTOM_LLM_API_KEY — optional внутренний bearer override; если подходящего override нет, ключ выводится сервером из OWNER_SECRET. Не нужно создавать публичный секрет или передавать binding браузеру.
+
+## 6. Настроить TTS voice
+
+Обычный путь после заполнения LIVEAVATAR_API_KEY и ELEVENLABS_API_KEY:
+
+~~~powershell
+npm run provider:configure
+~~~
+
+scripts/configure-liveavatar.ts регистрирует ElevenLabs TTS secret, выбирает/импортирует voice и сохраняет только voice references. Если ELEVENLABS_VOICE_ID пуст, helper выбирает premade voice. Для списка голосов ElevenLabs key должен иметь voices_read; при отказе разрешений helper даст понятную ошибку. Conversational Agent/Agent ID/dashboard tools/context/LLM configuration не создаются.
+
+Helper заполняет в игнорируемом .env.local:
+
+~~~dotenv
+LIVEAVATAR_ELEVENLABS_SECRET_ID=
+LIVEAVATAR_VOICE_ID=
+LIVEAVATAR_VOICE_SOURCE=elevenlabs
+~~~
+
+Пустые строки здесь показывают имена, не команды для очистки готовых значений. Secrets браузер не получает. Повтор helper переиспользует references; после смены конфигурации перезапустите приложение.
+
+Для отдельного технического sandbox-теста можно выбрать built-in LiveAvatar voice:
+
+~~~powershell
+npm run provider:configure -- --test-default-voice
+~~~
+
+Сначала задайте LIVEAVATAR_SANDBOX=true. Этот флаг helper запрещён вне sandbox; он пишет LIVEAVATAR_VOICE_SOURCE=liveavatar-test и тестовый voice ID, не регистрирует ElevenLabs TTS. Такой тест не принимает качество/права/биллинг ElevenLabs. Для обычного прогона повторите provider:configure без test-флага: helper заменит тестовый voice импортированным ElevenLabs. Тестовый source нельзя использовать при sandbox=false.
+
+## 7. Ограничить тестовую попытку
+
+Для проверенного Free-аккаунта:
+
+~~~dotenv
+INTAKE_SESSION_LIMIT_SECONDS=120
+INTAKE_MAX_CONCURRENCY=1
+LIVEAVATAR_SANDBOX=true
+~~~
+
+Sandbox дополнительно ограничивает попытку 60s. Обычный FULL использует настроенные 120s; абсолютный продуктовый потолок — 300s, но он не отменяет меньшие account limits. Reconnect не продлевает попытку.
+
+FULL 2 credits/min и 10 доступных credits дают примерно 5 минут суммарного LiveAvatar usage, а не одну разрешённую пятиминутную Free-сессию. ElevenLabs TTS/модели считаются отдельно. Задайте INTAKE_DAILY_BUDGET_CENTS и INTAKE_ATTEMPT_RESERVE_CENTS консервативно для всего теста; это наши лимиты в USD cents, не заявленная цена поставщиков. Новые покупки/overage не нужны.
+
+## 8. Разрешить ограниченный локальный тест
+
+1. Проверьте LIVEAVATAR_API_KEY/AVATAR_ID/VOICE_ID, корректный voice source, хотя бы один model key, APP_ORIGIN и серверные auth/encryption secrets. Внешнего callback URL не требуется.
+2. Установите AVATAR_INTAKE_ENABLED=true в .env.local.
+3. Выполните npm run calls:enable и перезапустите npm run dev после сохранения env.
+4. Дождитесь независимого cleanup heartbeat. Call admission требует env-флаг, PostgreSQL avatar_intake=true, конфигурацию и свежий heartbeat одновременно.
+5. Обновите страницу. GET /api/intake/config показывает intakeContractVersion:2, availability и фактический sessionLimitSeconds. До готовой конфигурации доступна форма.
+
+Квота по умолчанию — 3 intake-попытки/IP/UTC-день отдельно от будущих тренировок; серверная INTAKE_ATTEMPTS_PER_IP допускает 1–10. Общий денежный резерв и concurrency проверяются отдельно и не увеличиваются вместе с этой настройкой. Повтор активного запроса не создаёт вторую платную попытку. Не повышайте бюджеты, чтобы обходить невыясненную ошибку.
+
+  ## 9. Пройти первый живой тест
+
+**Sandbox-проверка пройдена:** настоящее видео и звук, ASR, ответы модели, сохранение кандидата, ручное подтверждение и End с закрытием provider session/микрофона. Проверена production-сборка без подмены таймеров; LiveAvatar credits 10 → 10. Использован built-in test voice, не ElevenLabs. Для вашего TTS-голоса ключу пока недостаёт voices_read. Полная продуктовая приёмка, Safari и качество перебиваний остаются отдельно в [acceptance.md](acceptance.md); детали — в [progress.md](progress.md).
+
+1. До Start нет звука, запроса устройств и provider session. Start → Check microphone; камеру сначала оставить выключенной.
+2. Connect to Alex. Проверить один слышимый голос, lip sync, субтитры и живое видео отдельно от постера. Записать voice source: built-in transport-only или импортированный ElevenLabs.
+3. Проверить ASR event → сохранённый transcript → owner /respond → signed internal boundary → model/ProfileControl → SDK.repeat. Нефинансовый пример: “I want to talk to my partner about how we divide household tasks. I want us to agree on a fair plan. I want to sound calm and considerate.” Коуч не спрашивает обязательную зарплату/рынок.
+4. Проверить kind/ситуацию/собеседника/goal и optional desiredTone. Они кандидатные; только человек нажимает Confirm.
+5. Перебить ответ и исправить цель. Старый хвост не должен возобновиться; новое предложение отображается без автоматического подтверждения.
+6. End/review закрывают медиа, микрофон и provider session. Reload восстанавливает brief, не включает устройства и не начинает новую платную попытку.
+7. Отдельно проверить custom-тему: бытовая договорённость, выступление или любой другой контекст. Money details остаются пустыми.
+8. Если денег касается именно эта задача, проверить явные USD/period/gross-net и исправления. Смена salary → relationship очищает старые суммы; другая валюта остаётся словами без подмены на USD.
+9. Проверить deny mic, camera on/off, обрыв сети, End во время startup, две вкладки, deadline и abandoned-call cleanup. Free не допускает две одновременные provider sessions: отказ должен быть понятным.
+10. Записать фактические model/voice/config versions, deadline, stop, credits/usage и ограничения браузера. Затем отдельно desktop Chrome, реальный Safari/iPhone и нужную сеть. Offline E2E не доказывают реальный звонок.
+
+Для аварийного выключения — npm run calls:disable. Cleanup должен закрыть оставшиеся попытки; при ошибке stop повторяется. Проверьте provider sessions отдельно.
+
+## 10. Перед публикацией
+
+- Обычное постоянное HTTPS размещение UI и точный APP_ORIGIN. Модельный boundary остаётся подписанным внутри сервера; отдельный внешний callback/tunnel не нужен.
+- Approved стилизованный product avatar вместо sandbox Wayne; честная метка AI coach.
+- Рабочая PostgreSQL, миграция, защищённые серверные secrets, бюджет и постоянно работающий cleanup. Подробности в [runbook](runbook.md).
+- Проверенные provider retention/delete controls. У нас raw audio/video не сохраняются; это не определяет retention у LiveAvatar/ElevenLabs/модельного provider.
+- Trusted IP header только если ingress удаляет входящее значение и выставляет своё. Иначе действует консервативная общая квота.
+- Фактическая [приёмка](acceptance.md) живого медиа; никакого обещания production readiness по одному HTTP 200.
+
+Scribe/MediaPipe/pitchfinder, полный roleplay/debrief и финансовое ядро — отдельные последующие слои, не требование для подготовки обычной темы.

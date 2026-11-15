@@ -2,7 +2,9 @@ import pg from 'pg';
 const enabled=!process.argv.includes('--off');
 if(!process.env.DATABASE_URL)throw new Error('DATABASE_URL is required.');
 if(enabled){
-  for(const name of ['LIVEAVATAR_API_KEY','LIVEAVATAR_AVATAR_ID','LIVEAVATAR_ELEVENLABS_SECRET_ID','ELEVENLABS_COACH_AGENT_ID'])if(!process.env[name])throw new Error('Complete the provider values in .env.local first.');
+  for(const name of ['LIVEAVATAR_API_KEY','LIVEAVATAR_AVATAR_ID','LIVEAVATAR_VOICE_ID'])if(!process.env[name])throw new Error('Complete the provider values in .env.local first.');
+  if(!process.env.OPENAI_API_KEY&&!process.env.ANTHROPIC_API_KEY)throw new Error('Configure at least one direct model API key.');
+  if(process.env.LIVEAVATAR_VOICE_SOURCE==='liveavatar-test'&&process.env.LIVEAVATAR_SANDBOX!=='true')throw new Error('The built-in test voice is allowed only in sandbox. Configure the product voice first.');
   if(process.env.AVATAR_INTAKE_ENABLED!=='true')throw new Error('Set AVATAR_INTAKE_ENABLED=true in .env.local first.');
 }
 const pool=new pg.Pool({connectionString:process.env.DATABASE_URL});

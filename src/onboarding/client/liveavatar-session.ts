@@ -2,31 +2,24 @@ import type { SessionFactory } from './call';
 import { startWithMicrophoneCheck } from './sdk-start';
 
 export const createLiveAvatarSession:SessionFactory=async(token,callbacks,deviceId)=>{
-  const {ElevenLabsAgentSession,AgentEventsEnum,SessionEvent}=await import('@heygen/liveavatar-web-sdk');
-  const session=new ElevenLabsAgentSession(token,{autoKeepAlive:false,voiceChat:{...(deviceId?{deviceId}:{}),defaultMuted:true}});
-  let video:HTMLVideoElement|null=null;let lastAssistantId='';let lastAssistantText='';
+  const {LiveAvatarSession,AgentEventsEnum,SessionEvent}=await import('@heygen/liveavatar-web-sdk');
+  const session=new LiveAvatarSession(token,{autoKeepAlive:false,voiceChat:{...(deviceId?{deviceId}:{}),defaultMuted:true}});
+  let video:HTMLVideoElement|null=null;
   session.on(AgentEventsEnum.USER_TRANSCRIPTION,event=>callbacks.caption('user',event.text,event.event_id));
-  session.on(AgentEventsEnum.AVATAR_TRANSCRIPTION,event=>{lastAssistantId=event.event_id;lastAssistantText=event.text;callbacks.caption('assistant',event.text,event.event_id);});
+  session.on(AgentEventsEnum.USER_SPEAK_STARTED,()=>callbacks.speechStarted?.());
+  session.on(AgentEventsEnum.AVATAR_TRANSCRIPTION,event=>callbacks.caption('assistant',event.text,event.event_id));
   session.on(SessionEvent.SESSION_DISCONNECTED,()=>callbacks.disconnected());
   session.on(SessionEvent.SESSION_CONNECTION_QUALITY_CHANGED,quality=>callbacks.quality(String(quality)));
-  session.on(AgentEventsEnum.ELEVENLABS_AGENT_EVENT,event=>{
-    const data=event.data as Record<string,unknown>;
-    if(event.elevenlabs_event_type==='client_tool_call') {
-      const tool=(data.client_tool_call??data) as Record<string,unknown>;
-      if(typeof tool.tool_call_id==='string'&&typeof tool.tool_name==='string')callbacks.tool(tool.tool_call_id,tool.tool_name,tool.parameters);
-    }
-    if(event.elevenlabs_event_type==='agent_response_correction') {
-      const correction=(data.agent_response_correction_event??data) as Record<string,unknown>;
-      if(typeof correction.corrected_agent_response==='string'&&lastAssistantId){lastAssistantText=correction.corrected_agent_response;callbacks.caption('assistant',lastAssistantText,lastAssistantId,true);}
-    }
-    if(event.elevenlabs_event_type==='interruption'&&lastAssistantId)callbacks.caption('assistant',lastAssistantText,lastAssistantId,true);
-  });
+  // SDK attach() returns early before both remote tracks exist and does not retry.
+  session.on(SessionEvent.SESSION_STREAM_READY,()=>{if(video)session.attach(video);});
   return {
-    start:()=>startWithMicrophoneCheck(session),stop:()=>session.stop(),keepAlive:()=>session.keepAlive(),
-    releaseMicrophone(){session.voiceChat.stop();if(video)video.muted=true;},
+    start:()=>startWithMicrophoneCheck(session),stop(){video=null;return session.stop();},keepAlive:()=>session.keepAlive(),
+    releaseMicrophone(){session.voiceChat.stop();if(video){video.muted=true;video=null;}},
     setMuted:muted=>muted?session.voiceChat.mute():session.voiceChat.unmute(),
     attach(element){video=element;video.muted=false;session.attach(video);},
-    sendToolResult(id,result,isError){session.sendClientToolResult({toolCallId:id,result,isError});},
-    sendText(text){session.sendUserMessage(text);},
+    sendToolResult(){throw new Error('LiveAvatar FULL profile tools run on the server; client tool results are unsupported.');},
+    sendText(text){session.message(text);},
+    speak(text){session.repeat(text);},
+    interrupt(){session.interrupt();},
   };
 };

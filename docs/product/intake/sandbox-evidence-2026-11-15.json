@@ -1,0 +1,51 @@
+{
+  "date": "2026-11-15",
+  "input": "Synthetic fictional microphone fixture; real LiveAvatar/model/PostgreSQL",
+  "productionTimerOverrides": false,
+  "scope": "Sandbox transport, ASR/respond/repeat and manual closure; imported ElevenLabs TTS and product asset unaccepted",
+  "status": "passed",
+  "sandbox": true,
+  "voice": "LiveAvatar built-in test voice",
+  "elevenLabsTtsAccepted": false,
+  "elapsedMs": 36143,
+  "manualEnd": true,
+  "providerClosed": true,
+  "tracksEnded": true,
+  "userTurns": 3,
+  "profileFields": [
+    "goal",
+    "kind",
+    "description",
+    "counterpartRole"
+  ],
+  "confirmed": true,
+  "reloadWithoutDevices": true,
+  "creditsBefore": "10.0",
+  "creditsAfter": "10.0",
+  "stats": {
+    "audioBytes": 61138,
+    "videoBytes": 6779652,
+    "videoFrames": 565,
+    "outboundAudio": 136160,
+    "audioEnergy": 1.258074730464625
+  },
+  "responses": [
+    {
+      "action": "connect",
+      "status": 200
+    },
+    {
+      "action": "respond",
+      "status": 200
+    },
+    {
+      "action": "respond",
+      "status": 200
+    },
+    {
+      "action": "stop",
+      "status": 200
+    }
+  ],
+  "browserErrors": []
+}

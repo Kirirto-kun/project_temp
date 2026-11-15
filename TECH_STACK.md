@@ -1,113 +1,113 @@
 # Holdline — единый технический стек
 
-**Статус: принято владельцем продукта 15 ноября 2026.** Обязательно для веток A/B/C/D и новых задач. Этот документ заменяет прежние решения о собственном LiveKit, Python worker, OpenAI Realtime, Redis и объектном хранилище аудио. План задачи описывает реализацию в рамках этого стека; не выбирает другой стек самостоятельно.
+**Статус: решение владельца от 15 ноября 2026, редакция universal API coach / контракт v2.** Продукт помогает готовиться к любым разговорам: интервью, обратной связи, конфликтам, отношениям, презентациям и собственным темам. Деньги — необязательный частный случай. Текущий объём — знакомство с коучем, короткая проба вступления и подтверждённый brief; отдельные полноценные roleplay/debrief и финансовый движок этим изменением не объявляются реализованными.
 
-Сначала читать этот файл, затем [PLAN.md](PLAN.md), свой план в [docs/superpowers/plans](docs/superpowers/plans/) и [brandbook.html](brandbook.html). Правила работы агентов — [AGENTS.md](AGENTS.md). Версии пакетов и Node закрепляет B в общем `package.json`/`package-lock.json`; один менеджер пакетов — npm.
+Это решение заменяет прежние LITE + ElevenLabs Agent Connector и обязательную зарплатную анкету. Также отменены собственный LiveKit, Python worker, OpenAI Realtime, Redis и объектное хранилище аудио. При конфликте старого плана с этим документом применить новую редакцию. Детали: [spec](docs/superpowers/specs/2026-11-15-universal-api-coach-design.md), [план реализации](docs/superpowers/plans/2026-11-15-universal-api-coach.md).
+
+Сначала читать этот файл, [AGENTS.md](AGENTS.md), [PLAN.md](PLAN.md), свой план A/B/C/D и [brandbook.html](brandbook.html). Общие версии Node/пакетов и единственный npm lockfile ведёт B.
 
 ## 1. Принятые технологии
 
-| Область | Единое решение | Граница ответственности |
+| Область | Решение | Граница |
 |---|---|---|
-| Приложение | Next.js App Router, React, TypeScript strict, Node.js | Весь наш runtime-код — TypeScript/JavaScript, включая API и фоновые задания |
-| UI | Tailwind CSS, shadcn/ui, Lucide, токены Holdline | Брендбук — источник цветов, шрифтов, состояний и иллюстраций |
-| Контракты | Zod, общие DTO в `src/contracts/**` | Один `QuizAnswers` для формы и голосового входа; денежные поля в целых minor units |
-| Видеокоуч | HeyGen **LiveAvatar LITE + ElevenLabs Agent Connector** | Комнату и соединение голос ↔ видео обслуживает LiveAvatar |
-| Браузерный видеоклиент | `@heygen/liveavatar-web-sdk` | Подключение, локальные устройства, субтитры, события, mute/end; камера пользователя не публикуется |
-| Голосовой коуч | Отдельный **ElevenLabs Agent «Коуч»** | Задаёт вопросы, получает ответы, вызывает client tool `save_profile` |
-| Голосовые переговоры | Отдельный **ElevenLabs Agent «Собеседник»**, клиент `@elevenlabs/client` | Custom LLM обращается к нашему серверному pipeline; это другой этап, не второй параллельный голос |
-| Движок | Чистый TypeScript | Классификатор → детерминированное ядро → актёр; все денежные переходы вычисляет код |
-| LLM | Поддерживаемый ElevenLabs провайдер для коуча; серверные `ModelPorts` для pipeline | Anthropic допустим; конкретные provider/model IDs закрепляются конфигурацией и проверками, не захардкожены в клиентах |
-| Основная база | **Существующая PostgreSQL** | Профили, сессии, ходы, дедупликация, квоты, бюджеты, feature flags и состояния заданий |
-| Транскрипция | ElevenLabs **Scribe**, с таймингами слов | Аудио отправляется на обработку и освобождается; transcript/timings/метрики сохраняются в PostgreSQL `jsonb` |
-| Локальный звук | Web Audio API, MediaRecorder | Согласованный захват пользовательского микрофона, без дорожки аватара |
-| Pitch | `pitchfinder`, только в браузере | Поздний этап, выключен до приёмки и включается feature flag |
-| Камера и движения | MediaPipe Pose / Face Landmarker, Web Worker / WASM | Поздний этап, только после opt-in; в БД выбранные агрегаты и coverage, без кадров и видео |
-| Оплата | Polar | Серверные webhook, orders и entitlements в PostgreSQL |
-| Проверки | Vitest, Playwright, ESLint, TypeScript | Unit/integration и браузерные E2E; платные provider smoke отдельно от бесплатного CI |
-| CI / размещение | GitHub Actions; Next.js + PostgreSQL + планировщик TS-заданий | Конкретный хостинг фиксирует B; отдельного голосового runtime на Python нет |
+| Приложение | Next.js App Router, React, TypeScript strict, Node.js | Весь наш runtime — TS/JS |
+| UI | Tailwind CSS, shadcn/ui, Lucide, токены Holdline | Брендбук задаёт цвета, шрифты и иллюстрации |
+| Контракты | Zod, общие QuizAnswers / QuizDraft в src/contracts/domain.ts | Форма и коуч сохраняют один draft, intake API v2 |
+| Видеокоуч | LiveAvatar FULL и официальный @heygen/liveavatar-web-sdk | LiveAvatar обслуживает ASR, turn-taking, комнату, медиа и lip sync |
+| Модель коуча | Прямой серверный OpenAI Chat Completions API или Anthropic Messages API | Не GPT Realtime; ElevenLabs Agent не нужен |
+| Голос | ElevenLabs TTS voice, импортированный в LiveAvatar | API key находится в provider secret store; отдельного разговорного Agent нет |
+| Подписанная модельная граница | Owner-authenticated /respond → внутренний callback в том же серверном процессе | Bearer + HMAC intake/epoch/deadline, server transcript/prompt и кандидат профиля; внешний ingress не нужен |
+| База | Существующая PostgreSQL, согласованный DB-слой и миграции B | Профили, sessions, turns, receipts, budgets, flags и задания; без runtime Map fallback |
+| Финансовое ядро | Чистый TypeScript, отдельный будущий специализированный слой | Денежные переходы считает код; готовность оценивается отдельно от обычного brief |
+| Речевые измерения | Поздний Scribe proxy → transcript/timings/метрики в jsonb | В текущем модуле analysis capabilities выключены |
+| Локальный анализ | Поздние Web Audio / MediaRecorder / pitchfinder / MediaPipe | Только после отдельной приёмки, флагов и opt-in; камера локальна |
+| Оплата | Polar, будущая отдельная интеграция | Серверные webhooks и права; не условие подготовки произвольной темы |
+| Проверки | TypeScript, ESLint, Vitest, Playwright | Бесплатные unit/SQL/E2E отдельно от ограниченных живых вызовов |
 
-LiveKit может присутствовать **внутри клиентского SDK LiveAvatar как транспорт**. Это не означает собственный LiveKit-проект: не создаём свой медиасервер, комнаты/dispatch, LiveKit Agents или отдельные LiveKit credentials. Наш сервер получает session token через API LiveAvatar, сохраняет привязку попытки и управляет stop/cleanup.
+LiveKit может быть внутренним транспортом официального Web SDK. Собственный проект, сервер, credentials, dispatch и LiveKit Agents worker не создаём. Запускается одно говорящее медиа-соединение LiveAvatar; дополнительный ElevenLabs widget/Agent не подключаем.
 
 ## 2. Поток первого звонка
 
-```text
-Браузер → наш Next.js API → PostgreSQL: draft, owner, revision, квота/резерв
-                           ↓
-                    LiveAvatar session API
-                           ↓
-Браузер ↔ LiveAvatar Web SDK ↔ управляемая комната LiveAvatar
-                                 ↕ ElevenLabs Agent Connector
-                           ElevenLabs Agent «Коуч»
+~~~text
+Браузер → same-origin Next.js API → PostgreSQL: owner/draft/revision/квота
+Явный Connect → резерв бюджета → LiveAvatar FULL token без context/LLM config
+Браузер ↔ официальный SDK ↔ LiveAvatar: managed ASR / медиа / lip sync
+                ↓ финальный USER_TRANSCRIPTION
+        /api/intake/:id/events → server transcript
+                ↓ после фиксации
+        owner-authenticated POST /api/intake/:id/respond
+                ↓ сервер загружает свой transcript/attempt
+        внутренний callback Request: Bearer + HMAC intake/epoch/deadline
+                ↓
+        OpenAI Chat API или Anthropic → reply / changes / action
+                ↓
+        Zod ProfilePatch → ProfileControl → PostgreSQL → reply + view
+                ↓
+        браузер → SDK.repeat(reply) → один голос LiveAvatar / ElevenLabs TTS
 
-client_tool_call(save_profile)
-  → браузерный обработчик
-  → наш same-origin API
-  → owner / Origin / Zod / revision / idempotency / providerEpoch
-  → PostgreSQL: кандидат профиля
-  → client_tool_result обратно коучу
+USER_SPEAK_STARTED → SDK.interrupt + отмена/инвалидация предыдущего turn
+Review / End → provider stop + SDK/local-device cleanup → human Confirm
+~~~
 
-Пользователь проверяет карточку → явно подтверждает → QuizAnswers → тренировка
-```
+FULL token задаёт voice_id, язык, media settings и duration; provider context и vendor LLM configuration не создаются. Провайдер не вызывает нашу модельную HTTP-точку для текущего разговора. Обычного same-origin подключения UI достаточно; отдельный публичный callback URL, proxy или tunnel не нужны.
 
-`save_profile` — **клиентский мост к нашему API**, а не прямое соединение браузера с БД и не привилегированная серверная команда модели. Не доверяем суммам, статусу confirmed, ownerId, оплате или разрешениям из tool payload. Модель может предложить ответы; подтверждение денежных полей делает человек. Исправление отзывает подтверждение зависимых полей. Сервер отдаёт подтверждённый профиль для запуска движка.
+Подписанный provider-callback контракт сохраняется как внутренний серверный boundary. /respond проверяет owner/Origin/client/epoch/latest committed turn и сам строит authenticated Request к существующему callback handler в процессе: Bearer + HMAC intake/epoch/deadline. Он использует сохранённый server transcript, серверный COACH_SYSTEM_PROMPT и owner-bound кандидат. CUSTOM_LLM_API_KEY — необязательный внутренний override; без него bearer выводится из OWNER_SECRET. Secrets/binding браузер не получает.
 
-Коннектор использует FULL-mode события поверх управляемого транспорта, хотя видеосессия LITE. Слушаем `elevenlabs_agent_event`, извлекаем `client_tool_call`; ответ отправляем `elevenlabs_agent_command` с внутренним типом `client_tool_result`. Стандартный LITE WebSocket-протокол для этого коннектора не применяется. Нельзя параллельно запускать второй ElevenLabs SDK-разговор ради обработки инструментов.
+Валидированный результат проходит через тот же ProfileControl с owner/revision/providerEpoch/idempotency; модель не подтверждает brief/согласие/права/оплату. PostgreSQL receipts, body/turn limits, повторная проверка epoch/deadline и cancellation сохраняются. Завершённый повтор переиспользует результат; in-flight duplicate не запускает вторую платную генерацию. Speech start отменяет/инвалидирует предыдущий ответ; End/delete/истёкшая epoch запрещают late write и playback.
 
-**Обязательные настройки:** платный ElevenLabs account; ключ с `convai_read`, `user_read`, `voices_read`; вывод агента **PCM 24K**. Ключ ElevenLabs регистрируется как secret в LiveAvatar; браузер его не получает. Для привязки конкретного draft допускается inline `elevenlabs_agent_config` с `secret_id`, `agent_id` и проверенными `dynamic_variables`. У сохранённого voice agent `language`/`dynamic_variables` per-session overrides не поддерживаются: выбирать способ конфигурации с учётом этого ограничения.
+Защищённые маршруты /api/avatar-llm/v1/chat/completions и alias без /v1 могут оставаться для будущей server-to-server интеграции. Их публикация не является условием текущего режима. Browser client tools и ElevenLabs Agent не нужны.
 
-## 3. PostgreSQL — единственное серверное хранилище
+## 3. Общий профиль v2 и граница денег
 
-Используем подключение существующей базы через серверный `DATABASE_URL`; не создаём независимую базу на разработчика или отдельную базу D. Если доступ к существующей схеме в checkout отсутствует, B предоставляет схему/миграции до интеграции. Наличие работающего подключения в этой ветке не считается подтверждённым без проверки.
+Обязательные поля полного общего QuizAnswers: kind, description, goal, counterpartRole. Для совместимости description допускает пустую строку в схеме, но missingFields считает её отсутствующей. QuizDraft — partial той же схемы; старые зарплатные drafts остаются читаемыми.
 
-- `profiles`: owner, версионированный draft / `QuizAnswers`, источник и статус подтверждения. Форма и `save_profile` используют одну структуру, не две несовместимые анкеты.
-- `sessions`: сценарий, snapshot, состояние, version, deadline, mode и привязка провайдера. Intake и negotiation явно различаются; вводный коуч не меняет деньги/доверие тренировки.
-- `turns`: зафиксированные ходы и ключи дедупликации; уникальность на session/turn и provider message identity, атомарная запись вместе с версией сессии.
-- `feature_flags`: серверный источник включённых функций. Входящие browser-флаги не разрешают платное действие.
-- Квоты, reservations, idempotency receipts и надёжные задания — PostgreSQL; B оформляет совместимые миграции в существующую схему. Не заводить параллельные реализации Redis/Upstash.
+- kind: raise, offer, rent, bill, interview, feedback, conflict, relationship, presentation, custom. custom принимает любую другую тему.
+- description: ситуация, до 4000 символов; goal: желаемый результат, 1–2000; counterpartRole: человек/роль/аудитория, 1–200. Поля обрезаются по краям.
+- desiredTone необязателен, 1–300 символов. userRole и fear необязательны; роль не обязана быть профессией.
+- Все monetary fields, conversationDate, inputMode, rangeSource и avatarId необязательны. Суммы currentMinor/targetMinor/marketLowMinor/marketHighMinor — целые USD cents, 1…10_000_000_000. При наличии суммы сервер требует currency=USD, period=year/month/one_time и moneyBasis=gross/net/unspecified; low не превышает high.
+- Другую валюту сохраняем словами в description, без молчаливого переименования в USD. Неизвестные суммы, диапазоны и единицы остаются отсутствующими.
+- Явная смена уже заданного kind, включая его очистку, сначала удаляет прежние суммы, currency/period/moneyBasis/rangeSource, затем применяет новый patch. Остаются только явно переданные заново деньги. Первое присвоение kind старому kindless draft само по себе его суммы не стирает.
+- Любое изменение профиля, включая goal, отзывает человеческое подтверждение. Контекст и цель видны до Confirm.
+- missingFields описывает только общую подготовку: kind, description, goal, counterpartRole. Отсутствие денег, market или avatar не блокирует обычную тему.
+- Подтверждённый brief и пустой missingFields не доказывают готовность финансовой симуляции. Будущий financial-engine validator отдельно проверяет поддерживаемый вид, суммы, диапазон, единицы и конфигурацию.
 
-CAS: `UPDATE ... WHERE id = $id AND version = $expectedVersion` с проверкой изменённой строки; составные операции в транзакции. Ограничение расходов и квота резервируются атомарно до платного запроса. Уникальные ограничения защищают от двойного хода и повторных webhook, а не только локальная проверка в памяти. Использовать существующий DB-слой; новый ORM самостоятельно не добавлять.
+## 4. PostgreSQL и доступ
 
-Draft/наблюдения/assessment по исходным правилам — 24 часа, с проверкой `expires_at` на чтении и периодической очисткой. Платёжные записи не наследуют этот TTL. Длительную историю профилей вводить отдельным явно согласованным продуктовым решением; сам переход на Postgres срок хранения не меняет. Map допустим в unit tests, не как работающий backend и не как production fallback.
+Используем существующий DATABASE_URL и единый DB-слой; модуль добавляет только согласованную схему holdline_intake. Новый ORM или независимую БД на ветку не добавлять. CAS, транзакции и уникальные ключи защищают повтор/конкуренцию между экземплярами; Map допустим только в unit fixtures.
 
-## 4. Аудио и локальный анализ
+Гостевой доступ использует HttpOnly owner cookie, серверную принадлежность ресурса и Origin checks для браузерных мутаций. ID из URL не даёт права доступа. Внутренний callback сохраняет отдельную сервисную авторизацию и HMAC-привязку к owner-bound попытке; оставшийся внешний route тоже не принимает неподписанный запрос. Provider bindings и API keys не попадают в public view.
 
-**По умолчанию аудио не сохраняем.** После согласия: запись пользователя → ограниченный серверный multipart/stream proxy → Scribe → transcript/timings в `jsonb` → освобождение временного blob/buffer. В логах, БД и файловом хранилище сырой записи нет. Повторить анализ после утраты blob можно новой явной записью; не обещать retry из несуществующего объекта.
+Наши draft/transcript/наблюдения имеют TTL 24h, проверяются на чтении и периодически удаляются. Платёжные записи не наследуют этот TTL. Изменение длительности истории — отдельное продуктовое решение. Delete и tombstone предотвращают позднее воскрешение.
 
-Асинхронный job не может ссылаться на уже уничтоженное аудио. B выбирает потоковую/синхронную обработку в пределах runtime либо отдельно реализует временный `bytea` под явным feature flag и согласием, с лимитом размера, `expires_at ≤ 24h` и проверяемой автоочисткой. «Послушать себя» выключено, пока эта отдельная возможность не принята. S3/R2 и signed object-storage uploads в базовом стеке отсутствуют.
+## 5. Lifecycle и расходы
 
-MediaPipe/pitchfinder — последние слои, выключены до проверок. Камера optional; без галочки нет анализа или отправки features. Измерять можно наблюдаемую ориентацию головы и долю пригодных кадров, а не обещать достоверный «контакт глазами» или распознавание нервозности. Не сохраняем видео, кадры или raw landmarks. Согласие на анализ камеры не заменяет согласие на запись/разбор аудио; политика удержания у провайдеров проверяется отдельно.
+- До явного действия пользователя нет платного звонка и запроса устройств. Создание draft не обращается к провайдеру.
+- INTAKE_SESSION_LIMIT_SECONDS задаёт deadline, максимум 300s. У проверенного Free-аккаунта максимум 120s и одна одновременная сессия; локальная настройка — 120. Sandbox ограничен 60s. Reconnect не продлевает попытку.
+- Intake имеет отдельную квоту до 3 попыток/IP/UTC-день, атомарный резерв и глобальный бюджет. Reserve — консервативный предел, не заявленная цена звонка. Явный restart после stop расходует новую квоту.
+- Нужны AVATAR_INTAKE_ENABLED=true, PostgreSQL calls:enable, полный provider config и свежий heartbeat независимого cleanup. Browser unload не заменяет provider stop и серверное reconciliation.
+- Review/End/error освобождают LiveAvatar, SDK, микрофон и локальную камеру. Failed/ambiguous stop остаётся pending и повторяется; closed не объявляется по одному disconnect.
+- Проверенные 10 LiveAvatar credits при FULL 2 credits/min соответствуют примерно 5 минутам суммарного LiveAvatar usage, а не разрешению на пятиминутную Free-попытку. ElevenLabs TTS и модели оплачиваются отдельно. Покупка планов или включение overage не требуется и не авторизовано.
+- LIVEAVATAR_SANDBOX=true использует designated Wayne для технической проверки до 60s без LiveAvatar credits. Это тестовый режим; он не заменяет одобренного стилизованного продуктового коуча и не делает сторонние API бесплатными.
 
-## 5. Аватар и бренд
+## 6. Аудио, камера и бренд
 
-**И коуч, и каталог собеседников — иллюстрированные/стилизованные персонажи в стиле брендбука. Сгенерированные фотореалистичные лица не используем.** Постоянная метка AI; пользовательская камера только в локальном self-view. Исключение для фотореалистичного коуча из прежней версии брендбука отменено решением владельца.
+Raw audio/video по умолчанию не сохраняем. Поздний анализ: явное согласие → временная запись → ограниченный Scribe proxy → transcript/timings в PostgreSQL jsonb → уничтожение blob/buffer. Job не ссылается на уже уничтоженную запись. Опциональный replay через bytea ≤24h требует отдельного флага, согласия, лимитов размера и автоочистки; S3/R2 не добавляем.
 
-LiveAvatar поддерживает стилизованных/3D/non-human персонажей, но создание custom avatar — отдельная процедура. Для ряда персонажей нужны подготовленное видео, consent и ручное одобрение HeyGen; нельзя обещать мгновенную анимацию любой PNG. D вместе с владельцем выбирает готовый допустимый avatar ID или проходит процедуру custom avatar. До готового asset не подменять его фотореалистичным stock-аватаром и не выдавать постер за работающий звонок.
+MediaPipe/pitchfinder выключены до отдельной приёмки. Камера optional, только local self-view; видео, кадры и raw landmarks не отправляются на наш сервер. Нельзя выводить эмоции, диагноз, честность или личностные качества из голоса/камеры. Provider retention проверяется отдельно.
 
-## 6. Lifecycle, доступ и расходы
+Продуктовый коуч и каталог — иллюстрации/стилизованные персонажи брендбука с постоянной меткой AI. Сгенерированные фотореалистичные лица запрещены. PNG-постер не доказывает наличие approved live asset; custom/non-human avatar может требовать подготовки и проверки провайдера. Wayne sandbox — только технический тест, без продуктового исключения.
 
-- До Start нет оплачиваемой сессии и автоматического запроса устройств. Гостевой доступ без логина, HttpOnly owner cookie и проверки владельца.
-- Звонок максимум 300 секунд на попытку; reconnect повторяет её ID/epoch/deadline. Явный restart после stop — новая квота. До 3 intake-попыток на IP/UTC-день отдельно от переговоров.
-- Сервер хранит provider session binding; disconnect/unload не является надёжной единственной командой stop. B/D обеспечивают stop, ограничение длительности у провайдера и TS cleanup/reconciliation по просроченным попыткам в БД. Без worker этот контроль всё равно нужен.
-- При review/End/error закрываем сессию LiveAvatar, SDK, микрофон и локальную камеру, затем разрешаем следующий голосовой этап. Не сообщать closed до успешного stop или подтверждённого завершения; failed cleanup должен повторяться.
-- API-ключи только на сервере/в secret store провайдера. В клиентах только короткоживущие scoped session credentials. `save_profile` использует owner-bound API; callback/webhook — подпись и привязку провайдера, если применяется.
-- Метаданные/события не меняют денежное ядро напрямую. OpenAI-compatible SSE для custom LLM — **формат API**, а не обязательство использовать OpenAI или Realtime.
+## 7. Владельцы и эксплуатация
 
-## 7. Кто делает что
-
-| Ветка | Реализация |
+| Ветка | Ответственность |
 |---|---|
-| A — engine | Общие Zod-контракты, `QuizAnswers`, денежные адаптеры, чистое ядро и ModelPorts; без изменения правил движка из-за смены транспорта |
-| B — platform | Существующая PostgreSQL и миграции, транзакции/дедупликация, auth, budgets/limits/jobs, ElevenLabs custom LLM/token API, Scribe proxy, Polar, env/CI/deploy |
-| C — product | Общий UI, форма по тем же данным, переговорный клиент ElevenLabs, capture/timeline, каталог иллюстраций, разбор и replay |
-| D — intake | LiveAvatar Web SDK и ElevenLabs connector, обработчик `save_profile`, API/UI первого звонка, stop/recovery, подтверждённый handoff; позднее локальный opt-in MediaPipe |
+| A | Общие схемы и деньги; будущие финансовые адаптеры/ядро и их отдельный readiness |
+| B | PostgreSQL/auth, budgets/flags/jobs, env/npm/CI/deploy, секреты и модельные API |
+| C | Общая оболочка, универсальная форма/маршруты, бренд и reusable capture; будущая тренировка отдельно |
+| D | LiveAvatar FULL/SDK, signed callback и модельный intake, brief/review/handoff, stop/recovery |
 
-Пакеты, миграции, общие контракты и `.env.example` меняются согласованно через своих владельцев. Не добавлять в отдельных ветках Python/uv/pytest, собственный LiveKit runtime, OpenAI Realtime, Redis/Upstash либо S3/R2 для аудио. Если уже начали старый вариант, убрать его runtime-зависимости и перенести полезные проверки lifecycle на новый адаптер. Изменение этого решения требует явного решения владельца и обновления этого файла вместе с планами.
+Общие пакеты/миграции/схемы согласуются с владельцами. Не добавлять Python/uv/pytest, свой LiveKit, OpenAI Realtime, Redis/Upstash или S3/R2 для аудио. Сохранять границы планов с поправкой на контракт v2.
 
-## 8. Проверяемые источники
+Настройка: npm run provider:configure регистрирует ElevenLabs TTS secret и импортирует voice; context/LLM configuration/Agent ID не создаются. Для sandbox transport-only прогона доступен npm run provider:configure -- --test-default-voice: built-in LiveAvatar voice, без приёмки ElevenLabs TTS. APP_ORIGIN остаётся каноническим UI origin; отдельного внешнего callback/tunnel нет. Production UI требует обычного защищённого HTTPS размещения. Подробности: [setup](docs/product/intake/setup-ru.md), [runbook](docs/product/intake/runbook.md), [приёмка](docs/product/intake/acceptance.md).
 
-- [LiveAvatar ElevenLabs Agent Connector](https://docs.liveavatar.com/docs/lite-mode/connectors/elevenlabs-agent.md) — managed room, passthrough client tools, режим событий, платный ElevenLabs и PCM 24K.
-- [ElevenLabs client tools](https://elevenlabs.io/docs/eleven-agents/customization/tools/client-tools) — регистрация инструментов и ожидание результата.
-- [LiveAvatar SDK](https://www.npmjs.com/package/@heygen/liveavatar-web-sdk) — клиентское управление сессией.
-- [Кастомные и non-human аватары](https://help.heygen.com/en/articles/10035615-how-to-get-started-with-liveavatar) — процесс создания, ограничения и возможная ручная проверка.
-
-Это архитектурное решение, а не отчёт о готовности продукта. Версии SDK, подключение существующей PostgreSQL, два агента, client tools, avatar ID, фактическая стоимость и закрытие сессий принимаются реальными проверками G0/G1.
+Проверенные ключи, HTTP 200 и успешная текстовая генерация на обеих моделях не доказывают работу медиа. Полный звонок, lip sync, перебивания, реальное завершение и расходы принимаются отдельно и фиксируются в progress.md.

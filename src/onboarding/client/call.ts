@@ -1,4 +1,4 @@
-import type { ClientEvent,ClientTool,Connection,ConnectInput,IntakeView,StopReason,TranscriptItem } from '../contracts';
+import type { ClientEvent,ClientTool,ClientRespond,CoachReply,Connection,ConnectInput,IntakeView,StopReason,TranscriptItem } from '../contracts';
 import { ClientToolSchema } from '../contracts';
 import { ApiError } from './api';
 
@@ -7,17 +7,20 @@ export interface CallSession {
   start():Promise<void>;stop():Promise<void>;releaseMicrophone():void;setMuted(muted:boolean):Promise<void>;
   attach(element:HTMLVideoElement):void;keepAlive():Promise<void>;
   sendToolResult(id:string,result:string,isError:boolean):void;sendText(text:string):void;
+  speak(text:string):void;interrupt():void;
 }
 export interface SessionCallbacks {
   caption(role:'user'|'assistant',text:string,turnId:string,interrupted?:boolean):void;
   tool(callId:string,name:string,parameters:unknown):void;
   disconnected():void;quality(quality:string):void;
+  speechStarted?():void;
 }
 export type SessionFactory=(token:string,callbacks:SessionCallbacks,deviceId?:string)=>Promise<CallSession>;
 export interface CallApi {
   connect(input:ConnectInput,key:string):Promise<Connection>;
   event(input:ClientEvent):Promise<{continue:boolean;view:IntakeView}>;
   tool(input:ClientTool):Promise<{view:IntakeView;missingFields:string[]}>;
+  respond(input:ClientRespond,signal:AbortSignal):Promise<CoachReply>;
   read():Promise<IntakeView>;stop(reason:StopReason,key:string,providerEpoch?:number):Promise<IntakeView>;
 }
 interface CallCallbacks {onState(state:CallState):void;onView(view:IntakeView):void;onCaption(item:TranscriptItem):void;onError(message:string):void;onQuality?(quality:string):void}
@@ -39,16 +42,20 @@ export class CallController {
   private tools=new Map<string,Promise<void>>();
   private toolQueue=Promise.resolve();
   private eventQueue=Promise.resolve();
+  private replyGeneration=0;
+  private replyAbort:AbortController|null=null;
   constructor(private api:CallApi,private factory:SessionFactory,private callbacks:CallCallbacks,readonly clientId:string) {}
   private setState(state:CallState){this.state=state;this.callbacks.onState(state);}
   attach(element:HTMLVideoElement){this.video=element;this.session?.attach(element);}
   private clearTimers(){if(this.heartbeat)clearInterval(this.heartbeat);if(this.timeout)clearTimeout(this.timeout);if(this.deadline)clearTimeout(this.deadline);this.heartbeat=this.timeout=this.deadline=null;}
+  private cancelReply(){this.replyAbort?.abort();this.replyAbort=null;this.replyGeneration++;}
   async start(view:IntakeView,deviceId?:string) {
     if(this.state==='connecting'||this.state==='connected'||this.state==='ending')return;
     const generation=++this.generation;this.setState('connecting');this.callbacks.onError('');
     this.attemptEpoch=view.providerEpoch+1;this.lastKeepAlive=Date.now();
     this.heartbeatFailures=0;this.tools.clear();
-    this.timeout=setTimeout(()=>{this.callbacks.onError('Alex is taking longer to connect. Your brief is saved. You can try again or use the form.');void this.end('error');},15000);
+    this.cancelReply();this.replyGeneration=0;
+    this.timeout=setTimeout(()=>{this.callbacks.onError('Alex is taking longer to connect. Your brief is saved. You can try again or use the form.');void this.end('error');},30000);
     try {
       const connection=await this.api.connect({expectedRevision:view.revision,mode:'video',restart:view.providerEpoch>0,clientId:this.clientId},crypto.randomUUID());
       if(generation!==this.generation){await this.api.stop('user',crypto.randomUUID(),connection.providerEpoch).catch(()=>{});return;}
@@ -58,12 +65,24 @@ export class CallController {
       this.deadline=setTimeout(()=>void this.end('timeout'),Math.max(0,Date.parse(connection.deadlineAt)-Date.now()));
       const session=await this.factory(connection.sessionToken,{
         caption:(role,text,turnId,interrupted=false)=>{
-          if(generation!==this.generation)return;
+          if(generation!==this.generation||!text.trim())return;
           const item={role,text:text.slice(0,4000),turnId:turnId.slice(0,160),interrupted};this.callbacks.onCaption(item);
-          this.eventQueue=this.eventQueue.then(async()=>{
+          const committed=this.eventQueue.then(async()=>{
             if(generation!==this.generation)return;
             const result=await this.api.event({clientId:this.clientId,providerEpoch:connection.providerEpoch,eventId:crypto.randomUUID(),type:'transcript',transcript:item});
+            if(generation!==this.generation)return;
             this.callbacks.onView(result.view);
+            if(!result.continue)await this.end('timeout');
+          });
+          this.eventQueue=committed.catch(()=>{});
+          if(role==='user')void this.respondToUser(item.turnId,generation,connection,committed);
+        },
+        speechStarted:()=>{
+          if(generation!==this.generation)return;
+          this.cancelReply();this.session?.interrupt();
+          this.eventQueue=this.eventQueue.then(async()=>{
+            if(generation!==this.generation)return;
+            await this.api.event({clientId:this.clientId,providerEpoch:connection.providerEpoch,eventId:crypto.randomUUID(),type:'speech_started'});
           }).catch(()=>{});
         },
         tool:(id,name,parameters)=>{if(generation===this.generation)this.handleTool(id,name,parameters,generation);},
@@ -82,11 +101,28 @@ export class CallController {
       await session.setMuted(false);
       if(generation!==this.generation){session.releaseMicrophone();await session.stop().catch(()=>{});return;}
       if(this.timeout)clearTimeout(this.timeout);this.timeout=null;this.setState('connected');
+      if(this.replyGeneration===0)session.speak('Hi, I am Alex, your AI practice coach. What conversation would you like to prepare for? You can skip any question or end at any time.');
     }catch(error){
       if(generation!==this.generation)return;
       this.callbacks.onError(error instanceof ApiError?error.message:'Alex could not connect. Check your microphone or use the quick form.');
       await this.end('error');
     }
+  }
+  private async respondToUser(turnId:string,generation:number,connection:Connection,committed:Promise<void>){
+    this.cancelReply();const replyGeneration=this.replyGeneration;const abort=new AbortController();this.replyAbort=abort;
+    const current=()=>generation===this.generation&&replyGeneration===this.replyGeneration&&this.connection===connection&&!abort.signal.aborted;
+    try{
+      await committed;if(!current())return;
+      const response=await this.api.respond({clientId:this.clientId,providerEpoch:connection.providerEpoch,turnId},abort.signal);
+      if(!current()||response.providerEpoch!==connection.providerEpoch||response.turnId!==turnId)return;
+      this.callbacks.onView(response.view);
+      if(!['connecting','active'].includes(response.view.mediaStatus)){await this.end('review');return;}
+      this.session?.speak(response.reply);
+    }catch(error){
+      if(!current())return;
+      this.callbacks.onError(error instanceof ApiError?error.message:'The coach could not answer. Your brief is saved; you can use the form.');
+      await this.end('error');
+    }finally{if(this.replyAbort===abort)this.replyAbort=null;}
   }
   private async pulse(generation:number) {
     if(this.heartbeatBusy||!this.connection||generation!==this.generation)return;
@@ -135,7 +171,7 @@ export class CallController {
   async end(reason:StopReason) {
     if(this.ending)return this.ending;
     if(this.state==='ended')return;
-    ++this.generation;this.clearTimers();this.setState('ending');
+    ++this.generation;this.cancelReply();this.clearTimers();this.setState('ending');
     const session=this.session;this.session=null;
     session?.releaseMicrophone();
     if(this.video){this.video.pause();this.video.muted=true;this.video.srcObject=null;}
