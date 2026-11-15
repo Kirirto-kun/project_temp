@@ -100,6 +100,11 @@ export function applyMove(config: ScenarioConfig, state: CoreState, move: Move):
       const open = firstOpen(config, draft);
       if (move.hasReason) {
         draft.trust += 3;
+        // A reasoned ask in reply to an objection answers it, the same way a bare reason does.
+        if (state.lastAction?.kind === 'object' && clearFirstMatching(config, draft, 'justify')) {
+          action = concedeAction(config, draft, move.amountMinor, step);
+          break;
+        }
         action = open ? { kind: 'object', objectionId: open.id } : concedeAction(config, draft, move.amountMinor, step);
       } else {
         draft.patience -= 2;

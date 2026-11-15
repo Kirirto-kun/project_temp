@@ -162,6 +162,26 @@ export interface ClassifyOptions {
  * once and then becomes `offtopic`; an unavailable provider falls back to the rules.
  */
 export async function classifyMove(input: TurnInput, context: SessionState, deps: ModelPorts, options: ClassifyOptions = {}): Promise<Move> {
+  return withoutRepeatCredit(await classifyFresh(input, context, deps, options), input.text, context);
+}
+
+/** Letters and digits only, so a reply typed or pasted again compares equal. */
+function replyKey(text: string): string {
+  return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+/**
+ * A reply the user already sent in this round earns no second credit: its reason was counted
+ * the first time. A repeated reason becomes `offtopic`, a repeated reasoned ask loses the reason.
+ */
+function withoutRepeatCredit(move: Move, text: string, context: SessionState): Move {
+  if (move.type !== 'justify' && !(move.type === 'state_number' && move.hasReason)) return move;
+  const key = replyKey(text);
+  if (!key || !context.turns.some((turn) => replyKey(turn.input.text) === key)) return move;
+  return move.type === 'justify' ? { ...move, type: 'offtopic', hasReason: false } : { ...move, hasReason: false };
+}
+
+async function classifyFresh(input: TurnInput, context: SessionState, deps: ModelPorts, options: ClassifyOptions): Promise<Move> {
   const config = context.scenarioSnapshot;
   const state = context.state;
   const text = input.text.trim();
