@@ -7,6 +7,8 @@
     "node": ">=22.0.0"
   },
   "scripts": {
+    "avatar:register-secret": "tsx --env-file-if-exists=.env.local scripts/avatar-register-secret.ts",
+    "avatar:sync-agent": "tsx --env-file-if-exists=.env.local scripts/avatar-sync-agent.ts",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -28,6 +30,7 @@
     "@base-ui/react": "1.9.0",
     "@elevenlabs/client": "1.36.1",
     "@elevenlabs/react": "1.22.1",
+    "@heygen/liveavatar-web-sdk": "0.0.20",
     "@mediapipe/tasks-vision": "1.1.1",
     "@number-flow/react": "0.6.2",
     "clsx": "2.1.1",

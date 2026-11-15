@@ -2,7 +2,7 @@ import type { IntakeHandoff, MoneyAnswer } from '@/contracts/intake';
 import { apiFetch, newClientId } from '@/client/api/client';
 import type { IntakeAssessment, IntakeView, RangeValue } from '../contracts';
 
-export async function createIntake(mode: 'text' | 'audio', audioAnalysis: boolean): Promise<IntakeView> {
+export async function createIntake(mode: 'text' | 'audio' | 'video', audioAnalysis: boolean): Promise<IntakeView> {
   return (await apiFetch<{ intake: IntakeView }>('/api/intake', { body: { mode, locale: 'en', consents: { audioAnalysis, visualAnalysis: false }, consentVersion: 1 }, idempotencyKey: newClientId('intake') })).intake;
 }
 
@@ -58,6 +58,10 @@ export async function deleteIntake(id: string): Promise<void> {
 
 export async function connectAudio(id: string, expectedRevision: number) {
   return apiFetch<{ intake: IntakeView; clientSecret: string; expiresAt: string; model: string; providerEpoch: number; deadlineAt: string }>(`/api/intake/${encodeURIComponent(id)}/connect`, { body: { expectedRevision } });
+}
+
+export async function connectVideo(id: string, expectedRevision: number) {
+  return apiFetch<{ intake: IntakeView; sessionToken: string; providerEpoch: number; deadlineAt: string }>(`/api/intake/${encodeURIComponent(id)}/connect`, { body: { expectedRevision, mode: 'video' } });
 }
 
 export async function postTranscript(id: string, providerEpoch: number, itemId: string, role: 'user' | 'coach', text: string): Promise<IntakeView> {

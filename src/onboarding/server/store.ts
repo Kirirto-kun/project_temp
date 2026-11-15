@@ -45,7 +45,12 @@ export class IntakeStore {
         const next = mutate(current);
         return next ? { ...next, revision: current.revision + 1 } : null;
       },
-      { ttlSeconds: seconds },
+      // A getter: `seconds` is only known once `mutate` has read the current session, so evaluate it at write time.
+      {
+        get ttlSeconds() {
+          return seconds;
+        },
+      },
     );
     if (!result.value) throw new ApiError('EXPIRED', 'This coach session has expired.');
     return { session: result.value, written: result.written };
