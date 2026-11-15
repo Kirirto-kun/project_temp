@@ -35,12 +35,12 @@ afterEach(() => {
 describe('per-IP daily limits from the environment', () => {
   it('keeps the documented defaults when nothing is set', () => {
     const env = readEnv(BASE);
-    expect([env.sessionsPerIpPerDay, env.intakeAttemptsPerIpPerDay, env.intakeMessagesPerIpPerDay, env.voiceBaselinesPerIpPerDay, env.audioUploadsPerIpPerDay]).toEqual([3, 3, 80, 6, 20]);
+    expect([env.sessionsPerIpPerDay, env.intakeAttemptsPerIpPerDay, env.intakeMessagesPerIpPerDay, env.voiceBaselinesPerIpPerDay, env.audioUploadsPerIpPerDay]).toEqual([3, 3, 2000, 6, 20]);
   });
 
   it('the coach message limit follows INTAKE_MESSAGES_PER_IP_PER_DAY', async () => {
     const byDefault = depsWith({});
-    expect(await accepted(() => byDefault.quota.consume('intake_message', 'ip-default'), 85)).toBe(80);
+    expect(await accepted(() => byDefault.quota.consume('intake_message', 'ip-default'), 2005)).toBe(2000);
     const raised = depsWith({ INTAKE_MESSAGES_PER_IP_PER_DAY: '2000', SESSIONS_PER_IP_PER_DAY: '1000' });
     expect(await accepted(() => raised.quota.consume('intake_message', 'ip-raised'), 200)).toBe(200);
     expect(await accepted(() => raised.quota.consume('session', 'ip-raised'), 10)).toBe(10);
