@@ -48,7 +48,7 @@ export function OpponentPicker() {
               role="radio"
               aria-checked={selected}
               className="option pop-in !items-start gap-4 !p-4 sm:!p-5"
-              style={{ ['--delay' as string]: `${i * 50}ms` }}
+              style={{ ['--delay' as string]: `${Math.round(120 * (1 - Math.pow(0.7, i)))}ms` }}
               onClick={() => setState({ ...state, avatarId: card.avatarId })}
             >
               <Avatar avatarId={card.avatarId} size={64} />

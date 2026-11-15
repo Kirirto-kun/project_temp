@@ -182,7 +182,7 @@ export function QuizFlow() {
           <section aria-labelledby="q-kind" className="grid gap-6">
             <StepHeader step={0} id="q-kind" title="What are you negotiating?" sub="Pick one. You can change it later." />
             <div className="grid grid-cols-2 gap-3">
-              {KIND_TILES.map((tile, i) => {
+              {KIND_TILES.map((tile) => {
                 const meta = KIND_META[tile.kind];
                 const Icon = meta.icon;
                 return (
@@ -191,8 +191,7 @@ export function QuizFlow() {
                     type="button"
                     aria-pressed={state.draft.kind === tile.kind}
                     onClick={() => chooseKind(tile.kind)}
-                    className="option pop-in min-h-[148px] flex-col items-start justify-between gap-6 !p-4 sm:!p-5"
-                    style={{ ['--delay' as string]: `${40 + i * 45}ms` }}
+                    className="option min-h-[148px] flex-col items-start justify-between gap-6 !p-4 sm:!p-5"
                   >
                     <span className="grid h-11 w-11 place-items-center rounded-[14px] bg-hold-tint text-hold-text" aria-hidden>
                       <Icon size={22} strokeWidth={1.75} />

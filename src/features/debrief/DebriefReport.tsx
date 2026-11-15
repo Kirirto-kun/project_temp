@@ -122,7 +122,7 @@ export function DebriefReport({ debrief, example = false, actions }: { debrief: 
             </div>
           )}
         </WindowCard>
-        <div className="card rise p-5 sm:p-6" style={{ ['--delay' as string]: '140ms' }}>
+        <div className="card p-5 sm:p-6">
           <OfferBar
             objective={debrief.objective}
             period={period}

@@ -7,6 +7,9 @@ interface Bar {
   amountMinor: number;
 }
 
+/** Reading-order stagger with shrinking gaps, so the group lands as one wave. */
+const DELAYS = [0, 60, 105, 135];
+
 const FILL: Record<Bar['key'], string> = {
   limit: 'repeating-linear-gradient(-45deg, var(--ink) 0 6px, color-mix(in srgb, var(--ink) 78%, transparent) 6px 12px)',
   target: 'var(--hold)',
@@ -64,7 +67,7 @@ export function OfferBar({
               <span className="label">{bar.label}</span>
               <span className="num text-[15px] font-semibold">{formatMoney(bar.amountMinor, period)}</span>
             </div>
-            <div className="bar-reveal flex h-3 gap-[3px]" style={{ ['--delay' as string]: `${i * 70}ms` }}>
+            <div className="bar-reveal flex h-3 gap-[3px]" style={{ ['--delay' as string]: `${DELAYS[i] ?? 150}ms` }}>
               <div className="rounded-full" style={{ width: `${objective === 'minimize' && isAgreed ? width - gapWidth : width}%`, background: FILL[bar.key] }} />
               {gapWidth > 0 && <div className="rounded-full" style={{ width: `${gapWidth}%`, background: 'var(--gap)' }} aria-hidden />}
             </div>

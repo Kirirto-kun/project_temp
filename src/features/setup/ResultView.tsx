@@ -57,7 +57,7 @@ export function ResultView() {
         <p className="relative m-0 text-[13.5px] leading-5 text-white/70">This is the distance to the target you set, not a proven loss. The round measures what you actually reach.</p>
       </section>
 
-      <div className="card rise p-5 sm:p-6" style={{ ['--delay' as string]: '140ms' }}>
+      <div className="card p-5 sm:p-6">
         <OfferBar objective={objective} period={d.period} currentMinor={d.currentMinor} offerMinor={null} targetMinor={d.targetMinor} />
         {d.marketLowMinor && d.marketHighMinor && (
           <dl className="m-0 mt-6 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 border-t border-line pt-5 text-[14px] leading-5">

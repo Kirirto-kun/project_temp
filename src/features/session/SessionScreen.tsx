@@ -223,8 +223,8 @@ function PositionTrack({ session }: { session: SessionView }) {
   return (
     <div className="grid gap-2" aria-hidden>
       <div className="relative h-2 rounded-full bg-sunken">
-        <div className="absolute inset-y-0 left-0 w-full origin-left rounded-full bg-hold/25 transition-transform duration-500 ease-[var(--ease-out)]" style={{ transform: `scaleX(${progress})` }} />
-        <div className="absolute inset-0 transition-transform duration-500 ease-[var(--ease-out)]" style={{ transform: `translateX(${progress * 100}%)` }}>
+        <div className="absolute inset-y-0 left-0 w-full origin-left rounded-full bg-hold/25 transition-transform duration-300 ease-[var(--ease-out)] motion-reduce:transition-none" style={{ transform: `scaleX(${progress})` }} />
+        <div className="absolute inset-0 transition-transform duration-300 ease-[var(--ease-out)] motion-reduce:transition-none" style={{ transform: `translateX(${progress * 100}%)` }}>
           <span className="absolute -left-[7px] -top-[3px] h-[14px] w-[14px] rounded-full bg-hold shadow-[0_0_0_3px_var(--raised),0_2px_6px_rgba(17,14,36,0.3)]" />
         </div>
       </div>
