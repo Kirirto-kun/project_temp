@@ -1,5 +1,6 @@
 'use client';
 
+import { ArrowRight, Loader2, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -9,6 +10,7 @@ import { formatMoney } from '@/domain/money';
 import { ApiClientError } from '@/client/api/client';
 import { getConfig, getDebrief, replay } from '@/client/api/session';
 import { recordResult } from '@/client/storage/plan';
+import { ScreenSkeleton } from '@/components/ui/skeleton';
 import { DebriefReport } from './DebriefReport';
 
 function Comparison({ current, previous }: { current: Debrief; previous: Debrief }) {
@@ -23,9 +25,14 @@ function Comparison({ current, previous }: { current: Debrief; previous: Debrief
     line = delta === 0 ? `Same result as the previous round: ${formatMoney(current.agreedMinor, current.period)}.` : delta > 0 ? `${formatMoney(delta, current.period)} better than your previous round.` : `${formatMoney(-delta, current.period)} below your previous round.`;
   }
   return (
-    <div className="card p-4">
-      <div className="label">Compared with your previous round</div>
-      <p className="m-0 mt-1 text-[15px]">{line}</p>
+    <div className="card flex items-start gap-3 p-5">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-hold-tint text-hold-text">
+        <RotateCcw size={16} strokeWidth={2} aria-hidden />
+      </span>
+      <div>
+        <div className="label">Compared with your previous round</div>
+        <p className="m-0 mt-1 text-[15.5px] leading-6">{line}</p>
+      </div>
     </div>
   );
 }
@@ -77,43 +84,54 @@ export function DebriefScreen({ sessionId }: { sessionId: string }) {
 
   if (error && !debrief) {
     return (
-      <div className="grid gap-4">
+      <div className="mx-auto grid max-w-[560px] justify-items-start gap-4">
+        <p className="eyebrow m-0">Debrief</p>
         <h1 className="h-title m-0">Debrief unavailable</h1>
         <p className="m-0 text-muted">{error}</p>
-        <Link href="/example" className="btn btn-secondary w-fit">
+        <Link href="/example" className="btn btn-secondary">
           See the example debrief
         </Link>
       </div>
     );
   }
-  if (!debrief) return <p className="text-muted">Loading the debrief…</p>;
+  if (!debrief) return <ScreenSkeleton variant="report" label="Loading the debrief…" />;
 
   return (
     <DebriefReport
       debrief={debrief}
       actions={
-        <div className="grid gap-3">
+        <div className="grid gap-4">
           {previous && <Comparison current={debrief} previous={previous} />}
-          <div className="flex flex-wrap items-center gap-3">
-            <button type="button" className="btn btn-primary btn-xl" onClick={() => void onReplay()} disabled={replaying}>
-              {replaying ? 'Starting…' : 'Replay this round'}
-            </button>
-            <Link href="/plan" className="btn btn-secondary">
-              Add to my plan
-            </Link>
-          </div>
-          <p className="m-0 text-[13px] text-muted">Same counterpart, same range. The replay is free; the wording of replies may differ, the rules do not.</p>
+          <section className="on-violet relative grid gap-5 overflow-hidden rounded-[28px] p-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-8" aria-label="Next">
+            <div className="pointer-events-none absolute -right-16 -top-20 h-60 w-60 rounded-full bg-violet-400/40 blur-3xl" aria-hidden />
+            <div className="relative grid gap-2">
+              <span className="text-[12px] font-medium uppercase tracking-[0.08em] text-white/70">Run it back</span>
+              <p className="m-0 text-[22px] font-bold leading-[1.2] tracking-[-0.025em] text-white">Same counterpart, same range. Try the better line.</p>
+              <p className="m-0 text-[13.5px] leading-5 text-white/75">The replay is free; the wording of replies may differ, the rules do not.</p>
+            </div>
+            <div className="relative grid gap-2 sm:justify-items-end">
+              <button type="button" className="btn btn-white btn-xl" onClick={() => void onReplay()} disabled={replaying}>
+                {replaying ? <Loader2 size={18} className="animate-spin" aria-hidden /> : <RotateCcw size={18} strokeWidth={2} aria-hidden />}
+                {replaying ? 'Starting…' : 'Replay this round'}
+              </button>
+              <Link href="/plan" className="btn hero-ghost">
+                Add to my plan
+              </Link>
+            </div>
+          </section>
           {error && (
-            <p className="m-0 text-gap" role="alert">
+            <p className="callout callout-warn m-0 text-ink" role="alert">
               {error}
             </p>
           )}
           {(caps?.customScenario || caps?.offerAnalysis) && (
-            <div className="card grid gap-2 p-4">
-              <div className="label">Your own situation</div>
-              <p className="m-0 text-[15px]">Practise a scenario written from your own description, or get a real offer read line by line.</p>
-              <Link href="/pricing" className="btn btn-secondary w-fit">
-                See the conversation pack
+            <div className="card flex flex-wrap items-center justify-between gap-4 p-5">
+              <div className="grid gap-1">
+                <div className="label">Your own situation</div>
+                <p className="m-0 text-[15px] leading-6">Practise a scenario written from your own description, or get a real offer read line by line.</p>
+              </div>
+              <Link href="/pricing" className="btn btn-secondary">
+                See the conversation pack <ArrowRight size={16} strokeWidth={2} className="arrow" aria-hidden />
               </Link>
             </div>
           )}

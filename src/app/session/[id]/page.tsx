@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: 'Practice round' };
 export default async function SessionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   return (
-    <Page width="chat" minimalHeader>
+    <Page minimalHeader>
       <SessionScreen id={id} />
     </Page>
   );
