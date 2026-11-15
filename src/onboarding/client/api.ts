@@ -2,7 +2,7 @@ import type { IntakeHandoff, MoneyAnswer } from '@/contracts/intake';
 import { apiFetch, newClientId } from '@/client/api/client';
 import type { IntakeAssessment, IntakeView, RangeValue } from '../contracts';
 
-export async function createIntake(mode: 'text' | 'audio', audioAnalysis: boolean): Promise<IntakeView> {
+export async function createIntake(mode: 'text' | 'audio' | 'video', audioAnalysis: boolean): Promise<IntakeView> {
   return (await apiFetch<{ intake: IntakeView }>('/api/intake', { body: { mode, locale: 'en', consents: { audioAnalysis, visualAnalysis: false }, consentVersion: 1 }, idempotencyKey: newClientId('intake') })).intake;
 }
 
@@ -60,6 +60,10 @@ export async function connectAudio(id: string, expectedRevision: number) {
   return apiFetch<{ intake: IntakeView; clientSecret: string; expiresAt: string; model: string; providerEpoch: number; deadlineAt: string }>(`/api/intake/${encodeURIComponent(id)}/connect`, { body: { expectedRevision } });
 }
 
+export async function connectVideo(id: string, expectedRevision: number) {
+  return apiFetch<{ intake: IntakeView; sessionToken: string; providerEpoch: number; deadlineAt: string }>(`/api/intake/${encodeURIComponent(id)}/connect`, { body: { expectedRevision, mode: 'video' } });
+}
+
 export async function postTranscript(id: string, providerEpoch: number, itemId: string, role: 'user' | 'coach', text: string): Promise<IntakeView> {
   return (await apiFetch<{ intake: IntakeView }>(`/api/intake/${encodeURIComponent(id)}/transcript`, { body: { providerEpoch, itemId, role, text } })).intake;
 }
@@ -70,4 +74,8 @@ export async function relayTool(id: string, providerEpoch: number, callId: strin
 
 export async function submitPracticeAudio(id: string, audioId: string, turnId: string): Promise<IntakeView> {
   return (await apiFetch<{ intake: IntakeView }>(`/api/intake/${encodeURIComponent(id)}/practice`, { body: { audioId, turnId } })).intake;
+}
+
+export async function postVideoTurn(id: string, providerEpoch: number, itemId: string, text: string): Promise<{ intake: IntakeView; reply: string | null }> {
+  return apiFetch(`/api/intake/${encodeURIComponent(id)}/turn`, { body: { providerEpoch, itemId, text } });
 }

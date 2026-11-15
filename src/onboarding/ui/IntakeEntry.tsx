@@ -22,7 +22,7 @@ export function IntakeEntry() {
   const router = useRouter();
   const [caps, setCaps] = useState<Capabilities | null>(null);
   const [audioAnalysis, setAudioAnalysis] = useState(false);
-  const [busy, setBusy] = useState<'audio' | 'text' | null>(null);
+  const [busy, setBusy] = useState<'video' | 'audio' | 'text' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,7 +31,7 @@ export function IntakeEntry() {
       .catch(() => setCaps(null));
   }, []);
 
-  async function start(mode: 'audio' | 'text') {
+  async function start(mode: 'video' | 'audio' | 'text') {
     setBusy(mode);
     setError(null);
     try {
@@ -44,6 +44,8 @@ export function IntakeEntry() {
   }
 
   const voice = caps?.coachVoice ?? false;
+  const video = caps?.avatarIntake ?? false;
+  const spoken = video || voice;
   return (
     <div className="mx-auto grid max-w-[1000px] gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
       <section className="card rise grid content-start gap-6 p-6 sm:p-9" aria-labelledby="intake-title">
@@ -66,13 +68,17 @@ export function IntakeEntry() {
             <Clock size={14} strokeWidth={2} aria-hidden /> About 3–4 minutes
           </li>
           <li className="chip">
-            {voice ? <Mic size={14} strokeWidth={2} aria-hidden /> : <Keyboard size={14} strokeWidth={2} aria-hidden />} {voice ? 'Speak or type' : 'Type your answers'}
+            {spoken ? <Mic size={14} strokeWidth={2} aria-hidden /> : <Keyboard size={14} strokeWidth={2} aria-hidden />} {spoken ? 'Speak or type' : 'Type your answers'}
           </li>
           <li className="chip">
             {caps?.visualIntake ? <Camera size={14} strokeWidth={2} aria-hidden /> : <CameraOff size={14} strokeWidth={2} aria-hidden />} {caps?.visualIntake ? 'Camera optional, on your device' : 'No camera'}
           </li>
         </ul>
-        {voice && <p className="m-0 text-[14px] leading-6 text-muted">In a voice call your microphone goes to our speech provider so Alex can answer. You confirm every number on screen afterwards.</p>}
+        {spoken && (
+          <p className="m-0 text-[14px] leading-6 text-muted">
+            In a {video ? 'video' : 'voice'} call your microphone goes to our {video ? 'video provider' : 'speech provider'} so Alex can answer. You confirm every number on screen afterwards.
+          </p>
+        )}
         {caps?.voiceAnalysis && (
           <label className="flex cursor-pointer items-start gap-3 rounded-[16px] bg-paper-subtle p-4 text-[14px] leading-6 shadow-[inset_0_0_0_1px_var(--line)]">
             <input type="checkbox" className="mt-1 h-5 w-5 shrink-0" checked={audioAnalysis} onChange={(e) => setAudioAnalysis(e.target.checked)} />
@@ -80,7 +86,7 @@ export function IntakeEntry() {
           </label>
         )}
         <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
-          <button type="button" className="btn btn-primary btn-xl" disabled={busy !== null} onClick={() => void start(voice ? 'audio' : 'text')}>
+          <button type="button" className="btn btn-primary btn-xl" disabled={busy !== null} onClick={() => void start(video ? 'video' : voice ? 'audio' : 'text')}>
             {busy ? (
               <>
                 <Loader2 size={18} className="animate-spin" aria-hidden /> Starting…
@@ -91,7 +97,7 @@ export function IntakeEntry() {
               </>
             )}
           </button>
-          {voice && (
+          {spoken && (
             <button type="button" className="btn btn-secondary" disabled={busy !== null} onClick={() => void start('text')}>
               Type instead
             </button>

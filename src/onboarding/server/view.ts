@@ -14,7 +14,7 @@ export function toIntakeView(session: IntakeSession, capabilities: Capabilities)
     mediaStatus: session.mediaStatus,
     publicProfile: session.profile,
     committedTranscript: session.transcript.map((t) => ({ turnId: t.turnId, role: t.role, text: t.text })),
-    availability: { coachVoice: capabilities.coachVoice, audioAnalysis: capabilities.voiceAnalysis },
+    availability: { coachVoice: capabilities.coachVoice, avatarIntake: capabilities.avatarIntake, audioAnalysis: capabilities.voiceAnalysis },
     consents: session.consents,
     consentVersion: session.consentVersion,
     missingFields: build.missingFields,

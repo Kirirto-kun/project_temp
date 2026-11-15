@@ -14,6 +14,8 @@ export const COST_ESTIMATES = {
   scribePerMinute: 7_000,
   agentPerMinute: 120_000,
   realtimePerMinute: 300_000,
+  /** LiveAvatar LITE minute plus the ElevenLabs agent minute; conservative until measured. */
+  avatarPerMinute: 300_000,
 } as const;
 
 /** Token prices in micro-USD per token (from Anthropic's published per-million rates). */
@@ -23,7 +25,7 @@ export const TOKEN_PRICES: Record<string, { input: number; output: number }> = {
   'claude-sonnet-5-5': { input: 2, output: 10 },
 };
 
-export type BudgetCategory = 'llm' | 'scribe' | 'agents' | 'realtime';
+export type BudgetCategory = 'llm' | 'scribe' | 'agents' | 'realtime' | 'avatar';
 
 export interface Reservation {
   id: string;

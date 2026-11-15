@@ -23,7 +23,7 @@ export function computeCapabilities(env: ServerEnv, storage: { durable: boolean;
     offerAnalysis: payments,
     voiceClone: false,
     payments,
-    avatarIntake: false,
+    avatarIntake: spendOk && env.liveAvatar !== null,
     coachIntake: true,
     coachVoice: spendOk && env.openaiRealtime !== null,
     // Runs only in the browser; advertised only when switched on and the model files are deployed.
