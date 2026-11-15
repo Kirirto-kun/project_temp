@@ -1,5 +1,7 @@
 # Настройка универсального видеокоуча
 
+Для уже настроенной машины начни с [короткой инструкции запуска](quickstart-ru.md). Здесь — подробная первоначальная настройка провайдеров.
+
 Схема: **LiveAvatar FULL ASR event → owner API /respond → внутренний подписанный callback → OpenAI Chat API или Anthropic → reply → SDK.repeat; голос — ElevenLabs TTS через LiveAvatar**. LiveAvatar обслуживает ASR, turn-taking, комнату, медиа и lip sync. ElevenLabs Agent и dashboard tools не нужны. GPT Realtime, свой LiveKit/Python/Redis не используются.
 
 Коуч готовит любой разговор: интервью, feedback, конфликт, отношения, презентацию или собственную тему. Зарплата/рынок не нужны для обычного brief. Это знакомство и короткая проба вступления; отдельные полноценные roleplay/debrief ещё не объявлены реализованными.

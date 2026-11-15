@@ -14,6 +14,8 @@
 
 ## Локальный запуск
 
+**[Короткая инструкция запуска и восстановления](docs/product/intake/quickstart-ru.md)** — повторный запуск, обновление, ключи/голос, проверка готовности и типовые ошибки.
+
 ~~~powershell
 npm ci
 npm run setup:local
@@ -46,7 +48,7 @@ LiveAvatar FULL выдаёт managed ASR events. Клиент сохраняет
 
 Включение — AVATAR_INTAKE_ENABLED=true + npm run calls:enable + свежий cleanup heartbeat. APP_ORIGIN — канонический origin UI; локально подходит localhost. CUSTOM_LLM_API_KEY необязателен: внутренний bearer по умолчанию выводится из OWNER_SECRET. Настройте бюджет/конкуренцию до теста. Session limit ≤300s, проверенный Free ≤120s/одна сессия, sandbox ≤60s.
 
-Sandbox Wayne — только технический test asset. Продукту нужен approved стилизованный персонаж. Покупка/overage для настройки не требуются. Ключи/HTTP 200 и обе текстовые генерации прошли; **живое медиа пока не принято**.
+Sandbox Wayne — только технический test asset. Продукту нужен approved стилизованный персонаж. Покупка/overage для настройки не требуются. **Ограниченный живой sandbox-звонок с импортированным ElevenLabs TTS прошёл:** человеческое видео, звук, ASR, ответ модели, brief и проверенное закрытие сессии. Это не приёмка других браузеров, качества lip sync или обычного биллинга; [фактический результат](docs/product/intake/call-room-evidence-2026-11-15.json).
 
 - [Пошаговая настройка](docs/product/intake/setup-ru.md)
 - [Эксплуатация, Docker, API v2 и rollback](docs/product/intake/runbook.md)
