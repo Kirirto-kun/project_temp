@@ -17,6 +17,9 @@ export interface ServerEnv {
   dailyBudgetMicros: number | null;
   sessionsPerIpPerDay: number;
   intakeAttemptsPerIpPerDay: number;
+  intakeMessagesPerIpPerDay: number;
+  voiceBaselinesPerIpPerDay: number;
+  audioUploadsPerIpPerDay: number;
   demoPool: { token: string; sessions: number } | null;
 }
 
@@ -100,6 +103,9 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
     dailyBudgetMicros: Number.isFinite(budgetUsd) && budgetUsd > 0 ? Math.round(budgetUsd * 1_000_000) : null,
     sessionsPerIpPerDay: int(env.SESSIONS_PER_IP_PER_DAY, 3),
     intakeAttemptsPerIpPerDay: int(env.INTAKE_ATTEMPTS_PER_IP_PER_DAY, 3),
+    intakeMessagesPerIpPerDay: int(env.INTAKE_MESSAGES_PER_IP_PER_DAY, 80),
+    voiceBaselinesPerIpPerDay: int(env.VOICE_BASELINES_PER_IP_PER_DAY, 6),
+    audioUploadsPerIpPerDay: int(env.AUDIO_UPLOADS_PER_IP_PER_DAY, 20),
     demoPool: demoToken && demoToken.length >= 12 ? { token: demoToken, sessions: int(env.DEMO_POOL_SESSIONS, 10) } : null,
   };
 }

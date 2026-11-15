@@ -73,7 +73,14 @@ export function getDeps(): PlatformDeps {
   const models = capabilities.modelAssist ? modelPortsFromEnv(process.env, undefined, spend) : NO_MODEL;
   const quota = new Quota({
     kv,
-    limits: { ...DEFAULT_LIMITS, session: env.sessionsPerIpPerDay, intake: env.intakeAttemptsPerIpPerDay },
+    limits: {
+      ...DEFAULT_LIMITS,
+      session: env.sessionsPerIpPerDay,
+      intake: env.intakeAttemptsPerIpPerDay,
+      intake_message: env.intakeMessagesPerIpPerDay,
+      baseline: env.voiceBaselinesPerIpPerDay,
+      upload: env.audioUploadsPerIpPerDay,
+    },
     demoPool: env.demoPool ? { isMember: async (ownerId) => (await kv.get(`demo:${ownerId}`)) === '1', size: env.demoPool.sessions } : null,
   });
   const deps: PlatformDeps = {
