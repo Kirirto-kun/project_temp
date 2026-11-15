@@ -47,7 +47,7 @@ export function IntakeEntry() {
   const video = caps?.avatarIntake ?? false;
   const spoken = video || voice;
   return (
-    <div className="mx-auto grid max-w-[1000px] gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
       <section className="card rise grid content-start gap-6 p-6 sm:p-9" aria-labelledby="intake-title">
         <div className="flex items-center gap-4">
           <CoachMark size={64} idle />
@@ -85,26 +85,31 @@ export function IntakeEntry() {
             Analyse a recording of my practice sentence (pauses, filler words, pace). Optional; audio is deleted after the analysis, within 24 hours.
           </label>
         )}
-        <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
-          <button type="button" className="btn btn-primary btn-xl" disabled={busy !== null} onClick={() => void start(video ? 'video' : voice ? 'audio' : 'text')}>
-            {busy ? (
-              <>
-                <Loader2 size={18} className="animate-spin" aria-hidden /> Starting…
-              </>
-            ) : (
-              <>
-                Start the conversation <ArrowRight size={18} strokeWidth={2} className="arrow" aria-hidden />
-              </>
-            )}
-          </button>
-          {spoken && (
-            <button type="button" className="btn btn-secondary" disabled={busy !== null} onClick={() => void start('text')}>
-              Type instead
+        <div className="grid gap-4">
+          <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
+            <button type="button" className="btn btn-primary btn-xl" disabled={busy !== null} onClick={() => void start(video ? 'video' : voice ? 'audio' : 'text')}>
+              {busy ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" aria-hidden /> Starting…
+                </>
+              ) : (
+                <>
+                  Start the conversation <ArrowRight size={18} strokeWidth={2} className="arrow" aria-hidden />
+                </>
+              )}
             </button>
-          )}
-          <Link href="/quiz" className="btn btn-ghost">
-            Use the quick form
-          </Link>
+            {spoken && (
+              <button type="button" className="btn btn-secondary min-h-[56px] px-6 text-[16px]" disabled={busy !== null} onClick={() => void start('text')}>
+                Type instead
+              </button>
+            )}
+          </div>
+          <p className="m-0 text-[14.5px] leading-6 text-muted">
+            Rather fill in a form?{' '}
+            <Link href="/quiz" className="font-semibold text-hold-text">
+              Use the quick form
+            </Link>
+          </p>
         </div>
         {error && (
           <p className="callout callout-warn m-0 flex items-start gap-2 text-ink" role="alert">
