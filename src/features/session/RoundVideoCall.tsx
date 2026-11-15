@@ -6,6 +6,8 @@ import type { SessionView } from '@/contracts/domain';
 import { Avatar } from '@/components/holdline/Avatar';
 import { CallStage } from '@/components/holdline/CallStage';
 import { createAvatarSession } from '@/onboarding/client/avatar-session';
+import { withServerVoice } from '@/client/voice/line-voice';
+import { markTextInteraction } from '@/client/voice/speech';
 import { RoundAvatarCall, type RoundAvatarCallApi, type RoundCallState } from './RoundAvatarCall';
 import { useCountdown } from './useCountdown';
 
@@ -49,6 +51,8 @@ export default function RoundVideoCall({ session, current, turn, onFailed, onTyp
 
   function start() {
     if (callRef.current) return;
+    // Inside the click: unlocks audio playback for the counterpart's lines (Safari needs a gesture).
+    markTextInteraction();
     const call = new RoundAvatarCall(
       {
         connect: () => connectRoundVideo(sessionId),
@@ -58,7 +62,7 @@ export default function RoundVideoCall({ session, current, turn, onFailed, onTyp
           await stopRoundVideo(sessionId, epoch);
         },
       },
-      createAvatarSession,
+      withServerVoice(createAvatarSession, (messageId) => ({ kind: 'round', sessionId, messageId })),
       { state: setState, speaking: setSpeaking, live: setLive, failed: onFailed },
     );
     callRef.current = call;

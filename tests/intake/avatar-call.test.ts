@@ -66,7 +66,7 @@ describe('AvatarCall', () => {
   it('Alex says the greeting once the call is live', async () => {
     const { call, session } = setup();
     await call.start();
-    expect(session.speak).toHaveBeenCalledWith('Hi, I am Alex.');
+    expect(session.speak).toHaveBeenCalledWith('Hi, I am Alex.', 't1');
     expect(session.setMuted.mock.invocationCallOrder[0]!).toBeLessThan(session.speak.mock.invocationCallOrder[0]!);
   });
 
@@ -83,7 +83,7 @@ describe('AvatarCall', () => {
     gate.resolve({ intake: view(3), reply: 'Got it. Who will you talk to?' });
     await flush();
     expect(api.turn).toHaveBeenNthCalledWith(2, 1, 'e2', 'I want a raise');
-    expect(session.speak).toHaveBeenCalledWith('Got it. Who will you talk to?');
+    expect(session.speak.mock.calls.map((c) => c[0])).toContain('Got it. Who will you talk to?');
     expect(events.view).toHaveBeenCalledWith(view(3));
   });
 
@@ -129,7 +129,7 @@ describe('AvatarCall', () => {
       await call.start();
       callbacks().userSaid('Can I just ask for more?', 'e5');
       await drain();
-      expect(session.speak).toHaveBeenLastCalledWith(last);
+      expect(session.speak.mock.lastCall?.[0]).toBe(last);
       callbacks().userSpeaking();
       callbacks().userSaid('more words', 'e6');
       await drain();

@@ -26,14 +26,15 @@ export interface RoundAvatarCallEvents {
 }
 
 /** The counterpart's newest line: the opening on a fresh round, or the last reply. */
-export function lastCounterpartLine(view: SessionView | null): string | null {
+export function lastCounterpartLine(view: SessionView | null): { text: string; id: string } | null {
   const last = view?.messages.at(-1);
-  return last?.role === 'counterpart' ? last.text : null;
+  return last?.role === 'counterpart' ? { text: last.text, id: last.id } : null;
 }
 
 /** The counterpart's reply to one committed turn. */
-export function replyTo(view: SessionView, turnId: string): string | null {
-  return view.messages.find((m) => m.turnId === turnId && m.role === 'counterpart')?.text ?? null;
+export function replyTo(view: SessionView, turnId: string): { text: string; id: string } | null {
+  const line = view.messages.find((m) => m.turnId === turnId && m.role === 'counterpart');
+  return line ? { text: line.text, id: line.id } : null;
 }
 
 /**
@@ -91,7 +92,7 @@ export class RoundAvatarCall {
       }
       this.setState('active');
       const opening = lastCounterpartLine(this.api.current());
-      if (opening) session.speak(opening);
+      if (opening) session.speak(opening.text, opening.id);
     } catch (err) {
       if (!this.closed) await this.fail(err instanceof ApiClientError ? err.message : 'The video call could not connect. Check your microphone, or continue by typing.');
     } finally {
@@ -169,9 +170,10 @@ export class RoundAvatarCall {
             if (this.api.current()?.ended) return;
             const result = await this.api.turn(clean);
             if (this.closed || !result) return;
-            reply = replyTo(result.view, result.turnId);
+            const line = replyTo(result.view, result.turnId);
+            reply = line?.text ?? null;
             over = result.view.ended !== null;
-            if (reply) this.session?.speak(reply);
+            if (line) this.session?.speak(line.text, line.id);
           } finally {
             this.turnsInFlight -= 1;
             // The round is over: let the counterpart finish the line, then hang up.

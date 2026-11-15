@@ -46,11 +46,12 @@ export class ElevenLabsTts implements TtsClient {
  * JSON object the voice agent uses ({"warm_mid":"<voice id>", ...}); the key "coach" sets Alex's voice.
  */
 export const DEFAULT_VOICES: Readonly<Record<string, string>> = {
-  coach: 'EXAVITQu4vr4xnSDxMaL',
+  /** Alex is a man: Eric, a calm, trustworthy American conversational voice. */
+  coach: 'cjVigY5qzO86Huf0OWal',
   warm_mid: 'XrExE9yKIg1WjnnlVkGX',
   steady_low: 'JBFqnCBsd6RMkjVDRZzb',
   bright_mid: 'TX3LPaxmHKxFdv7VOQHJ',
-  calm_high: 'XB0fDUnXU5powFXDhCwa',
+  calm_high: 'EXAVITQu4vr4xnSDxMaL',
 };
 const FALLBACK_VOICE = 'JBFqnCBsd6RMkjVDRZzb';
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { COST_ESTIMATES } from '@/server/limits/budget';
 import type { LiveAvatarClient } from '@/onboarding/server/liveavatar';
-import { confirmProfile, connectVideo, createIntake, deleteIntake, handleTool, intakeStore, postMessage, stopMedia, videoTurn } from '@/onboarding/server/service';
+import { confirmProfile, connectVideo, createIntake, deleteIntake, handleTool, intakeStore, postMessage, stopMedia, videoTurn, isSmallTalk } from '@/onboarding/server/service';
 import { ALL_ON, IP, OWNER, makeDeps } from '../server/helpers';
 
 function fakeLiveAvatar(): LiveAvatarClient & { mintToken: ReturnType<typeof vi.fn>; stopSession: ReturnType<typeof vi.fn> } {
@@ -195,5 +195,23 @@ describe('video call', () => {
     const { deps, v } = await videoIntake();
     const { providerEpoch } = await connectVideo(deps, OWNER, IP, v.id, v.revision);
     await expect(videoTurn(deps, 'own_someoneelse0000000000', v.id, { providerEpoch, itemId: 'e1', text: 'hi' })).rejects.toBeTruthy();
+  });
+
+  it('a hello or a mic check gets a friendly reply instead of "I didn\u2019t catch"', async () => {
+    const { deps, v } = await videoIntake();
+    const { providerEpoch } = await connectVideo(deps, OWNER, IP, v.id, v.revision);
+    const turn = await videoTurn(deps, OWNER, v.id, { providerEpoch, itemId: 'e1', text: 'Hi Alex, can you hear me?' });
+    expect(turn.reply).toMatch(/^Hi! I can hear you\./);
+  });
+});
+
+describe('isSmallTalk', () => {
+  it('spots greetings and mic checks, not answers', () => {
+    expect(isSmallTalk('Hello, Alex.')).toBe(true);
+    expect(isSmallTalk('Hi Alex,')).toBe(true);
+    expect(isSmallTalk('can you hear me')).toBe(true);
+    expect(isSmallTalk('Привет, слышно?')).toBe(true);
+    expect(isSmallTalk('I want a raise from my manager')).toBe(false);
+    expect(isSmallTalk('Hello, I am a nurse and I want to ask my manager for a raise next week please')).toBe(false);
   });
 });

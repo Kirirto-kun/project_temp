@@ -14,7 +14,8 @@ export interface AvatarSession {
   start(): Promise<void>;
   attach(element: HTMLVideoElement): void;
   setMuted(muted: boolean): Promise<void>;
-  speak(text: string): void;
+  /** Says a server-owned line; `lineId` identifies it so our own voice can play it too. */
+  speak(text: string, lineId?: string): void;
   interrupt(): void;
   stop(): Promise<void>;
 }
@@ -46,9 +47,9 @@ export function goodbyeMs(text: string): number {
 }
 
 /** The last thing Alex said in a view (the greeting on a fresh call, or the last question on a reconnect). */
-export function lastCoachLine(view: IntakeView): string | null {
+export function lastCoachLine(view: IntakeView): { text: string; turnId: string } | null {
   const last = view.committedTranscript.at(-1);
-  return last?.role === 'coach' ? last.text : null;
+  return last?.role === 'coach' ? { text: last.text, turnId: last.turnId } : null;
 }
 
 /**
@@ -107,7 +108,7 @@ export class AvatarCall {
       }
       this.setState('active');
       const opening = lastCoachLine(credentials.intake);
-      if (opening) session.speak(opening);
+      if (opening) session.speak(opening.text, opening.turnId);
     } catch (err) {
       if (!this.closed) await this.fail(err instanceof ApiClientError ? err.message : 'Alex could not connect. Check your microphone; your answers are kept.');
     } finally {
@@ -176,7 +177,10 @@ export class AvatarCall {
           const { intake, reply } = await this.api.turn(this.epoch, itemId, clean);
           if (this.closed) return;
           this.events.view(intake);
-          if (reply) this.session?.speak(reply);
+          if (reply) {
+            const line = lastCoachLine(intake);
+            this.session?.speak(reply, line?.text === reply ? line.turnId : undefined);
+          }
           // The coach moved on to review: let Alex finish the line, then open the review.
           if (intake.phase === 'review' || intake.phase === 'completed') this.goodbye = setTimeout(() => void this.end('review'), goodbyeMs(reply ?? ''));
         });

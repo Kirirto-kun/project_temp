@@ -143,6 +143,15 @@ export async function postMessage(deps: PlatformDeps, ownerId: string, ipHash: s
 
 const extractContext = (s: IntakeSession): ExtractContext => ({ asked: s.askedField as AskedField, profile: s.profile, pending: s.pending, lastMoneyField: lastMoneyField(s) });
 
+/** A hello or a microphone check rather than an answer ("Hi Alex", "can you hear me?"). */
+export function isSmallTalk(text: string): boolean {
+  const words = text.toLowerCase().replace(/[^\p{L}\s']/gu, ' ').split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length > 8) return false;
+  const phrase = ` ${words.join(' ')} `;
+  const greetings = ['hi', 'hello', 'hey', 'hiya', 'yo', 'привет', 'здравствуйте', 'здравствуй', 'алло'];
+  return greetings.includes(words[0]!) || /^ good (morning|afternoon|evening) /.test(phrase) || / (can|do) you hear me /.test(phrase) || phrase.includes(' слышно ');
+}
+
 /**
  * One answer through the coach: extraction, profile update and Alex's next line. A model reading
  * is used only against the exact state it was made for (`readAt`); otherwise, or when it is
@@ -158,7 +167,8 @@ function coachTurn(s: IntakeSession, text: string, turnId: string, practice: boo
   const fromModel = reading && s.revision === readAt ? extractionFromModel(reading, text, extractContext(s)) : null;
   const extraction: Extraction = fromModel ?? extractFromUtterance(text, extractContext(s));
   const applied = applyExtraction({ ...s, transcript: [...s.transcript, userItem] }, extraction, turnId);
-  const reply = coachReply(applied.profile, extraction, seq, fromModel?.ack ?? null);
+  const greeting = !fromModel && extraction.touched.length === 0 && isSmallTalk(text) ? 'Hi! I can hear you.' : null;
+  const reply = coachReply(applied.profile, extraction, seq, fromModel?.ack ?? greeting);
   const phase = extraction.wantsEnd ? 'review' : reply.asked === 'mini_practice' && !extraction.clarification ? 'mini_practice' : 'interviewing';
   return { ...applied, transcript: [...applied.transcript, item('coach', reply.text, seq + 1)], askedField: reply.asked, phase };
 }
