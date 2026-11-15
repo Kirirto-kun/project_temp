@@ -43,4 +43,25 @@ describe('SessionRepo', () => {
     deps.clock.now += 24 * 3_600_000 + 1_000;
     expect(await new SessionRepo(deps.kv, deps.now).read(view.id)).toBeNull();
   });
+  it('keeps the 24-hour retention after an update (regression: updates set a 60s TTL)', async () => {
+    const deps = makeDeps();
+    const view = await createSession(deps, quizRequest(), { ownerId: OWNER, ipHash: IP, idempotencyKey: null });
+    const repo = new SessionRepo(deps.kv, deps.now);
+    await repo.update(view.id, (s) => ({ ...s, baselineId: null }));
+    deps.clock.now += 10 * 60_000;
+    expect(await repo.read(view.id)).not.toBeNull();
+  });
+});
+
+describe('updateJson TTL', () => {
+  it('evaluates a TTL function after mutate, against the written value', async () => {
+    let now = 0;
+    const kv = new MemoryKV(() => now);
+    await kv.set('k', JSON.stringify({ ttl: 3_600 }));
+    await updateJson<{ ttl: number }>(kv, 'k', (cur) => ({ ttl: cur!.ttl }), { ttlSeconds: (next) => next.ttl });
+    now += 120_000;
+    expect(await kv.get('k')).not.toBeNull();
+    now += 3_600_000;
+    expect(await kv.get('k')).toBeNull();
+  });
 });

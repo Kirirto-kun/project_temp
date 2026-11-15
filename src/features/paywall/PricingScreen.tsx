@@ -8,13 +8,14 @@ import type { ConfigResponse, EntitlementResponse } from '@/contracts/api';
 import { formatMoney } from '@/domain/money';
 import { ApiClientError } from '@/client/api/client';
 import { getConfig, getEntitlement, startCheckout } from '@/client/api/session';
+import { PLANS, PRICING_HEADLINE, TRIAL_THEN, type PlanKey } from '@/content/plans';
 
 export function PricingScreen() {
   const params = useSearchParams();
   const [config, setConfig] = useState<ConfigResponse | null>(null);
   const [entitlement, setEntitlement] = useState<EntitlementResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<PlanKey | null>(null);
   const returned = params.get('checkout') === 'success';
 
   useEffect(() => {
@@ -36,29 +37,30 @@ export function PricingScreen() {
     };
   }, [returned]);
 
-  async function buy() {
-    setBusy(true);
+  async function buy(plan: PlanKey) {
+    setBusy(plan);
     setError(null);
     try {
-      const checkout = await startCheckout();
+      const checkout = await startCheckout(plan);
       window.location.assign(checkout.checkoutUrl);
     } catch (err) {
-      setBusy(false);
+      setBusy(null);
       setError(err instanceof ApiClientError ? err.message : 'Checkout is not available right now.');
     }
   }
 
-  const product = config?.paidProduct ?? null;
-  const freeItems = ['The coach call or the quick form', 'Every standard round, with replays', 'The full debrief, money and voice'];
+  const purchasable = config?.paidPlans ?? [];
+  // A checkout that was opened and abandoned leaves the entitlement pending; only wait for it right after returning from checkout.
+  const waiting = entitlement?.status === 'pending' && returned;
+  const canBuy = entitlement?.status !== 'active' && !waiting;
+  const freeItems = ['The coach call or the quick form', 'A full round with your counterpart', 'The full debrief, money and voice'];
   const packItems = ['One scenario written from your own description', 'One analysis of a real offer you paste in'];
   return (
     <div className="mx-auto grid max-w-[960px] gap-10">
       <header className="grid justify-items-center gap-4 text-center">
         <p className="eyebrow m-0">Pricing</p>
-        <h1 className="h-section m-0 max-w-[16ch]">
-          Practice is free. <span className="serif text-hold-text">Your own scenario</span> is a pack.
-        </h1>
-        <p className="lede m-0">No subscription and nothing to cancel. Free rounds run within a daily limit.</p>
+        <h1 className="h-section m-0 max-w-[16ch]">{PRICING_HEADLINE}</h1>
+        <p className="lede m-0">Prices in US dollars. Every plan shows what it costs after the first period.</p>
       </header>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -68,7 +70,7 @@ export function PricingScreen() {
               Free
             </span>
             <div className="text-[44px] font-extrabold leading-none tracking-[-0.05em]">$0</div>
-            <p className="m-0 text-[14.5px] text-muted">The coach call, the quick form, every standard round, replays and the debrief, within a daily limit.</p>
+            <p className="m-0 text-[14.5px] text-muted">Your first round: the coach call or the quick form, the round itself and its debrief.</p>
           </div>
           <ul className="m-0 grid list-none gap-3 p-0">
             {freeItems.map((item) => (
@@ -87,15 +89,30 @@ export function PricingScreen() {
 
         <section className="on-violet relative grid content-start gap-5 overflow-hidden rounded-[24px] p-6 shadow-[var(--shadow-lift)] sm:p-8" aria-labelledby="plan-pack">
           <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-violet-400/40 blur-3xl" aria-hidden />
-          <div className="relative grid gap-2">
-            <div className="flex items-center justify-between gap-3">
-              <span id="plan-pack" className="text-[12px] font-medium uppercase tracking-[0.08em] text-white/75">
-                Conversation pack
-              </span>
-              <span className="badge bg-white/15 text-white">One-time</span>
-            </div>
-            <div className="text-[44px] font-extrabold leading-none tracking-[-0.05em] text-white">{product ? formatMoney(product.priceMinor) : '—'}</div>
-            <p className="m-0 text-[13.5px] text-white/80">One-time payment. No subscription, no renewal. Access is tied to this browser.</p>
+          <div className="relative grid gap-3">
+            <span id="plan-pack" className="text-[12px] font-medium uppercase tracking-[0.08em] text-white/75">
+              Plans
+            </span>
+            <ul className="m-0 grid list-none gap-2 p-0" aria-label="Plans">
+              {PLANS.map((plan) => (
+                <li key={plan.key} className="grid gap-0.5 rounded-[14px] bg-white/10 px-4 py-3 text-white">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                    <span className="text-[15px] font-semibold">{plan.label}</span>
+                    <span className="text-[22px] font-extrabold tracking-[-0.03em]">
+                      {formatMoney(plan.priceMinor)} <span className="text-[13px] font-medium text-white/80">{plan.per}</span>
+                    </span>
+                  </div>
+                  {plan.then && <span className="text-[13.5px] text-white/85">{plan.then}</span>}
+                  {plan.guarantee && <span className="text-[13.5px] text-white/85">{plan.guarantee}</span>}
+                  {canBuy && purchasable.includes(plan.key) && (
+                    <button type="button" className="btn btn-white mt-2 !max-w-none" onClick={() => void buy(plan.key)} disabled={busy !== null}>
+                      {busy === plan.key ? <Loader2 size={16} className="animate-spin" aria-hidden /> : null}
+                      {busy === plan.key ? 'Opening checkout…' : plan.key === 'trial' ? 'Start the 7-day trial' : `Choose ${plan.label}`}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
           </div>
           <ul className="relative m-0 grid list-none gap-3 p-0">
             {packItems.map((item) => (
@@ -122,17 +139,14 @@ export function PricingScreen() {
                   </Link>
                 </div>
               </>
-            ) : entitlement?.status === 'pending' ? (
+            ) : waiting ? (
               <p className="m-0 flex items-center gap-2 text-white/85" role="status">
                 <Loader2 size={16} className="animate-spin" aria-hidden /> Waiting for the payment confirmation…
               </p>
-            ) : product ? (
-              <button type="button" className="btn btn-white btn-xl !max-w-none" onClick={() => void buy()} disabled={busy}>
-                {busy ? <Loader2 size={18} className="animate-spin" aria-hidden /> : null}
-                {busy ? 'Opening checkout…' : `Buy for ${formatMoney(product.priceMinor)}`}
-              </button>
+            ) : purchasable.length > 0 ? (
+              <p className="m-0 text-[13.5px] text-white/85">Checkout opens on our payment provider’s page. This deployment runs in test mode: no real card is charged.</p>
             ) : (
-              <p className="m-0 rounded-[14px] bg-white/12 p-3 text-[14px] text-white/85">Payments are not enabled on this deployment.</p>
+              <p className="m-0 rounded-[14px] bg-white/12 p-3 text-[14px] text-white/85">Checkout is unavailable in this demo. Nothing will be charged.</p>
             )}
             {entitlement?.status === 'revoked' && <p className="m-0 rounded-[14px] bg-white/15 p-3 text-[14px] text-white">This pack was refunded, so its unused credits were removed.</p>}
             {error && (
@@ -146,7 +160,7 @@ export function PricingScreen() {
 
       <section id="billing" className="panel mx-auto grid w-full max-w-[720px] gap-2 p-6">
         <h2 className="m-0 text-[18px] font-semibold tracking-[-0.015em]">Why was I charged?</h2>
-        <p className="m-0 text-[15px] leading-6 text-muted">Only if you bought a conversation pack. The receipt from our payment provider shows the date and the amount. There is nothing to cancel because nothing renews.</p>
+        <p className="m-0 text-[15px] leading-6 text-muted">Only if you started a plan. The receipt from our payment provider shows the date, the plan and the amount. The 7-day trial continues as {TRIAL_THEN} unless you cancel it before the 7 days end.</p>
       </section>
     </div>
   );

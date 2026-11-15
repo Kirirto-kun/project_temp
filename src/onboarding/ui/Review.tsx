@@ -30,6 +30,28 @@ const FIELD_LABELS: Partial<Record<ProfileKey, string>> = {
   fear: 'Response you worry about',
 };
 
+const NO_KIND = 'This brief does not say what you are negotiating (a raise, a job offer, rent or a bill), so a practice cannot be built from it. Use the quick form below instead.';
+const NO_RANGE = 'Tick “Use practice bounds” above so the round has a range to work with, then confirm again.';
+
+/** Plain-English names for the handoff's missing fields; internal keys never reach the screen. */
+const MISSING_LABELS: Record<string, string> = {
+  counterpartRole: 'who you will speak with',
+  currentMinor: 'your current amount',
+  targetMinor: 'your target amount',
+  marketLowMinor: 'a range or practice bounds',
+  marketHighMinor: 'a range or practice bounds',
+  rangeSource: 'a range or practice bounds',
+  moneyBasis: 'the same tax basis (before or after tax) for both amounts',
+};
+
+function describeMissing(missing: string[]): string {
+  if (missing.includes('kind')) return NO_KIND;
+  // The tax basis is also absent whenever an amount is; name it only when it is the real blocker.
+  const amountMissing = missing.includes('currentMinor') || missing.includes('targetMinor');
+  const labels = [...new Set(missing.filter((f) => !(amountMissing && f === 'moneyBasis')).map((f) => MISSING_LABELS[f] ?? 'one more detail'))];
+  return `Still needed before practising: ${labels.join(', ')}. Edit the brief above, or use the quick form below.`;
+}
+
 function StatusTag({ status }: { status: string }) {
   if (status === 'confirmed') return <span className="badge badge-won">confirmed</span>;
   if (status === 'candidate') return <span className="badge badge-hold">check</span>;
@@ -154,6 +176,11 @@ export function Review({ view, onView }: { view: IntakeView; onView: (v: IntakeV
   }
 
   async function confirm() {
+    // Confirming completes the intake on the server, so stop here while the brief cannot become a round.
+    if (view.inputMode !== 'example') {
+      if (!p.kind.value) return setError(NO_KIND);
+      if (practice && !p.marketRange.value && !p.practiceRange.value) return setError(NO_RANGE);
+    }
     setBusy(true);
     setError(null);
     const fields = (Object.keys(p) as ProfileKey[]).filter((k) => p[k].status === 'candidate');
@@ -164,7 +191,7 @@ export function Review({ view, onView }: { view: IntakeView; onView: (v: IntakeV
       const missing = handoff.missingFields.filter((f) => f !== 'avatarId');
       if (missing.length > 0) {
         setBusy(false);
-        setError(`Still needed before practising: ${missing.join(', ')}.`);
+        setError(describeMissing(missing));
         return;
       }
       saveDraft({ ...EMPTY_DRAFT, draft: handoff.quizDraft, avatarId: null, intake: { intakeId: view.id, profileRevision: handoff.profileRevision, missingFields: handoff.missingFields } });

@@ -24,6 +24,8 @@ export const ALL_ON: Capabilities = {
   coachVoice: false,
   visualIntake: false,
   modelAssist: false,
+  speechInput: true,
+  speechOutput: true,
 };
 
 export interface TestDeps extends PlatformDeps {
@@ -54,6 +56,7 @@ export function makeDeps(overrides: Partial<PlatformDeps> & { scribeTranscript?:
     audio: memoryAudio,
     scribe,
     elevenlabs: { conversationToken: async () => 'conv-token', signedUrl: async () => 'wss://signed' },
+    speech: null,
     polar: { createCheckout: async () => ({ id: 'chk_1', url: 'https://polar.test/checkout/chk_1' }) },
     liveAvatar: null,
     schedule: (task) => {

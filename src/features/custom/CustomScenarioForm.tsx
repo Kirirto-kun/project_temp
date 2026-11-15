@@ -6,6 +6,7 @@ import { useState } from 'react';
 import type { Objective, Period } from '@/contracts/domain';
 import { ApiClientError } from '@/client/api/client';
 import { createCustomScenario, createSession } from '@/client/api/session';
+import { ChoiceCard } from '@/components/ui/ChoiceCard';
 import { AVATAR_CARDS } from '@/content/avatars';
 import { MoneyField } from '@/features/quiz/MoneyField';
 
@@ -72,19 +73,13 @@ export function CustomScenarioForm() {
         <span className="text-[15px] font-semibold">Who is the counterpart?</span>
         <input className="input" value={role} maxLength={60} onChange={(e) => setRole(e.target.value)} />
       </label>
-      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Direction">
-        <button type="button" role="radio" aria-checked={objective === 'maximize'} className="option" onClick={() => setObjective('maximize')}>
-          I want more
-        </button>
-        <button type="button" role="radio" aria-checked={objective === 'minimize'} className="option" onClick={() => setObjective('minimize')}>
-          I want to pay less
-        </button>
+      <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Direction">
+        <ChoiceCard selected={objective === 'maximize'} onSelect={() => setObjective('maximize')} title="I want more" />
+        <ChoiceCard selected={objective === 'minimize'} onSelect={() => setObjective('minimize')} title="I want to pay less" />
       </div>
       <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Period">
         {(['year', 'month', 'one_time'] as Period[]).map((p) => (
-          <button key={p} type="button" role="radio" aria-checked={period === p} className="option option-center" onClick={() => setPeriod(p)}>
-            {p === 'year' ? 'Per year' : p === 'month' ? 'Per month' : 'One-time'}
-          </button>
+          <ChoiceCard key={p} compact selected={period === p} onSelect={() => setPeriod(p)} title={p === 'year' ? 'Per year' : p === 'month' ? 'Per month' : 'One-time'} />
         ))}
       </div>
       <div className="grid gap-4 sm:grid-cols-2">

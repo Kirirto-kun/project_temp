@@ -193,7 +193,7 @@ export function HowItWorks() {
     },
   ] as const;
   return (
-    <section className="mx-auto w-full max-w-[1120px] px-4" aria-labelledby="how">
+    <section className="page-col" aria-labelledby="how">
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <div>
           <p className="eyebrow m-0">How it works</p>
@@ -228,7 +228,7 @@ export function HowItWorks() {
 
 export function Counterparts() {
   return (
-    <section className="mx-auto w-full max-w-[1120px] px-4" aria-labelledby="who">
+    <section className="page-col" aria-labelledby="who">
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <div>
           <p className="eyebrow m-0">Counterparts</p>
@@ -266,7 +266,7 @@ export function Counterparts() {
 export function DebriefPreview({ debrief }: { debrief: Debrief }) {
   const agreed = debrief.agreedMinor;
   return (
-    <section className="mx-auto grid w-full max-w-[1120px] items-start gap-10 px-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16" aria-labelledby="debrief-preview">
+    <section className="page-col grid items-start gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16" aria-labelledby="debrief-preview">
       <div className="lg:sticky lg:top-28">
         <p className="eyebrow m-0">The debrief</p>
         <h2 id="debrief-preview" className="h-section m-0 mt-4 max-w-[12ch]">
@@ -310,7 +310,7 @@ export function DebriefPreview({ debrief }: { debrief: Debrief }) {
           />
         </div>
         <div className="mt-4 hidden sm:block">
-          <TurnLedger rows={debrief.rows.slice(0, 2)} period={debrief.period} />
+          <TurnLedger rows={debrief.rows.slice(0, 2)} period={debrief.period} objective={debrief.objective} />
         </div>
       </InView>
     </section>
@@ -327,7 +327,7 @@ export function Principles() {
     { icon: Keyboard, title: 'Type or talk', text: 'Everything works by typing. Voice practice and the voice debrief are optional.' },
   ];
   return (
-    <section className="mx-auto w-full max-w-[1120px] px-4" aria-labelledby="principles">
+    <section className="page-col" aria-labelledby="principles">
       <div className="rounded-[32px] bg-paper-subtle p-6 shadow-[inset_0_0_0_1px_var(--line)] sm:p-10">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <h2 id="principles" className="m-0 max-w-[18ch] text-[clamp(28px,3.6vw,40px)] font-bold leading-[1.05] tracking-[-0.04em]">

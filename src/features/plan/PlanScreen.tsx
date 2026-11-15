@@ -53,7 +53,7 @@ export function PlanScreen() {
       <section className="grid gap-4 sm:grid-cols-3" aria-label="Gained in simulation">
         {gains.length === 0 ? (
           <div className="panel flex flex-wrap items-center justify-between gap-4 p-6 sm:col-span-3">
-            <p className="m-0 text-muted">No finished rounds yet. Results appear here after your first debrief.</p>
+            <p className="m-0 text-muted">{plan.results.length === 0 ? 'No finished rounds yet. Results appear here after your first debrief.' : 'No agreement reached yet. Replay a round to see what you gain.'}</p>
             <Link href="/intake" className="btn btn-primary btn-sm">
               Start a round
             </Link>

@@ -10,8 +10,12 @@ export function computeCapabilities(env: ServerEnv, storage: { durable: boolean;
   const model = spendOk && env.llmProvider !== 'none' && env.anthropicKey !== null;
   const eleven = env.elevenlabs;
   const voice = spendOk && Boolean(eleven?.agentId && eleven.customLlmSecret);
+  // Text-chat dictation and read-aloud need only the ElevenLabs key: nothing is stored.
+  const textSpeech = spendOk && Boolean(eleven) && env.textChatSpeech;
   const voiceAnalysis = spendOk && Boolean(eleven) && storage.audio;
-  const payments = Boolean(env.polar) && storage.durable && Boolean(env.appUrl);
+  // Entitlements live in the KV. An explicitly chosen memory driver is accepted for a demo deployment:
+  // access granted by a webhook is then lost on restart.
+  const payments = Boolean(env.polar) && (storage.durable || env.storageDriver === 'memory') && Boolean(env.appUrl);
   return {
     voice,
     voiceAnalysis,
@@ -29,5 +33,7 @@ export function computeCapabilities(env: ServerEnv, storage: { durable: boolean;
     // Runs only in the browser; advertised only when switched on and the model files are deployed.
     visualIntake: env.visualIntake && storage.visionAssets === true,
     modelAssist: model,
+    speechInput: textSpeech,
+    speechOutput: textSpeech,
   };
 }

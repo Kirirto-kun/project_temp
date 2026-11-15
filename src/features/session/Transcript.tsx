@@ -1,9 +1,12 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SessionMessage } from '@/contracts/domain';
+import { useSpeaker, type SpokenLine } from '@/client/voice/useSpeaker';
 import { Avatar } from '@/components/holdline/Avatar';
+import { ReplayButton, SpeakerToggle } from '@/components/holdline/SpeechControls';
 import { cn } from '@/components/ui/cn';
 
 export interface PendingLine {
@@ -16,10 +19,22 @@ export interface PendingLine {
 
 /**
  * The round's conversation. Lines already there on load stay still; new committed lines grow from
- * their bubble's tail. A pending reply is visibly separate from a committed one.
+ * their bubble's tail. A pending reply is visibly separate from a committed one. The counterpart's
+ * lines can be read aloud; `sessionId` defaults to the round in the URL (/session/<id>).
  */
-export function Transcript({ messages, pending, counterpartLabel, typing, avatarId }: { messages: SessionMessage[]; pending: PendingLine[]; counterpartLabel: string; typing: boolean; avatarId: string }) {
+export function Transcript({ messages, pending, counterpartLabel, typing, avatarId, sessionId }: { messages: SessionMessage[]; pending: PendingLine[]; counterpartLabel: string; typing: boolean; avatarId: string; sessionId?: string }) {
   const [initial] = useState(() => new Set(messages.map((m) => m.id)));
+  const pathname = usePathname();
+  const roundId = sessionId ?? pathname?.match(/^\/session\/([^/]+)\/?$/)?.[1] ?? null;
+  const spoken = useMemo(
+    () =>
+      messages
+        .filter((m) => m.role === 'counterpart')
+        .map((m): SpokenLine => ({ id: m.id, text: m.text, target: roundId ? { kind: 'round', sessionId: decodeURIComponent(roundId), messageId: m.id } : null })),
+    [messages, roundId],
+  );
+  const speaker = useSpeaker(spoken);
+  const lineById = new Map(spoken.map((l) => [l.id, l]));
   const endRef = useRef<HTMLDivElement | null>(null);
   const mounted = useRef(false);
   useEffect(() => {
@@ -33,6 +48,11 @@ export function Transcript({ messages, pending, counterpartLabel, typing, avatar
 
   return (
     <div className="grid gap-4">
+      {speaker.available && (
+        <div className="-mb-2 flex justify-end">
+          <SpeakerToggle speaker={speaker} />
+        </div>
+      )}
       <ol className="m-0 flex list-none flex-col gap-4 p-0" aria-label="Conversation">
         {messages.map((m) => {
           const you = m.role === 'user';
@@ -40,7 +60,10 @@ export function Transcript({ messages, pending, counterpartLabel, typing, avatar
             <li key={m.id} className={cn('flex max-w-[88%] gap-2.5', you ? 'flex-row-reverse self-end' : 'self-start', !initial.has(m.id) && (you ? 'msg-in msg-in-you' : 'msg-in'))}>
               {!you && <Avatar avatarId={avatarId} size={32} className="mt-6 hidden sm:inline-block" />}
               <div className={cn('flex min-w-0 flex-col gap-1.5', you && 'items-end')}>
-                <span className="label px-1">{you ? 'You' : counterpartLabel}</span>
+                <span className="label flex items-center gap-1 px-1">
+                  {you ? 'You' : counterpartLabel}
+                  {!you && lineById.has(m.id) && <ReplayButton speaker={speaker} line={lineById.get(m.id)!} />}
+                </span>
                 <div className={cn('px-4 py-3 text-[15.5px] leading-[1.5]', you ? 'bubble-you' : 'bubble-them')}>{m.text}</div>
               </div>
             </li>
@@ -69,7 +92,7 @@ export function Transcript({ messages, pending, counterpartLabel, typing, avatar
           </div>
         </div>
       )}
-      <div ref={endRef} aria-hidden />
+      <div ref={endRef} aria-hidden className="scroll-mb-36 sm:scroll-mb-0" />
     </div>
   );
 }

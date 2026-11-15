@@ -24,7 +24,8 @@ import {
   type TranscriptItem,
 } from '../contracts';
 import { buildFeedback, FORBIDDEN_FEEDBACK, speechObservations, textObservations, type SpokenWord } from '../domain/assessment-rules';
-import { extractFromUtterance, type AskedField, type Extraction } from '../domain/extract';
+import { extractFromUtterance, type AskedField, type ExtractContext, type Extraction } from '../domain/extract';
+import { extractionFromModel, MODEL_EXTRACTION_JSON_SCHEMA, MODEL_EXTRACTION_SYSTEM, modelExtractionInput, ModelExtractionSchema, type ModelExtraction } from '../domain/model-extract';
 import { buildDraftFromProfile, handoffFrom } from '../domain/handoff';
 import { coachReply, GREETING, nextField, questionFor } from '../domain/interviewer';
 import { applyCandidate, confirmFields, emptyProfile, markSkipped, markUnknown } from '../domain/profile';
@@ -112,6 +113,21 @@ export async function getIntake(deps: PlatformDeps, ownerId: string, id: string)
   return view(deps, await intakeStore(deps).readOwned(id, ownerId));
 }
 
+/** Model reading of one answer; null on any failure so the deterministic extractor runs. */
+async function readWithModel(deps: PlatformDeps, text: string, ctx: ExtractContext): Promise<ModelExtraction | null> {
+  if (!deps.models.available) return null;
+  const result = await callStructured(deps.models, {
+    purpose: 'intake_extract',
+    system: MODEL_EXTRACTION_SYSTEM,
+    input: modelExtractionInput(text, ctx),
+    jsonSchema: MODEL_EXTRACTION_JSON_SCHEMA,
+    schema: ModelExtractionSchema,
+    retries: 0,
+    timeoutMs: 8_000,
+  });
+  return result.ok ? result.value : null;
+}
+
 /** One text-coach exchange. Idempotent by turnId. */
 export async function postMessage(deps: PlatformDeps, ownerId: string, ipHash: string, id: string, input: { turnId: string; text: string; practice?: boolean }): Promise<IntakeView> {
   const store = intakeStore(deps);
@@ -119,21 +135,30 @@ export async function postMessage(deps: PlatformDeps, ownerId: string, ipHash: s
   if (current.transcript.some((t) => t.turnId === input.turnId)) return view(deps, current);
   if (current.phase === 'completed' || current.phase === 'expired') throw new ApiError('INVALID_INPUT', 'This coach session is finished. Review your brief.');
   await deps.quota.consume('intake_message', ipHash, ownerId);
-  const { session } = await store.update(id, (s) => (s.transcript.some((t) => t.turnId === input.turnId) ? null : coachTurn(s, input.text, input.turnId, Boolean(input.practice))));
+  const practice = current.phase === 'mini_practice' || Boolean(input.practice);
+  const reading = practice ? null : await readWithModel(deps, input.text, extractContext(current));
+  const { session } = await store.update(id, (s) => (s.transcript.some((t) => t.turnId === input.turnId) ? null : coachTurn(s, input.text, input.turnId, Boolean(input.practice), reading, current.revision)));
   return view(deps, session);
 }
 
-/** One answer through the deterministic coach: extraction, profile update and Alex's next line. */
-function coachTurn(s: IntakeSession, text: string, turnId: string, practice: boolean): IntakeSession {
+const extractContext = (s: IntakeSession): ExtractContext => ({ asked: s.askedField as AskedField, profile: s.profile, pending: s.pending, lastMoneyField: lastMoneyField(s) });
+
+/**
+ * One answer through the coach: extraction, profile update and Alex's next line. A model reading
+ * is used only against the exact state it was made for (`readAt`); otherwise, or when it is
+ * missing or ungrounded, the deterministic extractor decides.
+ */
+function coachTurn(s: IntakeSession, text: string, turnId: string, practice: boolean, reading: Awaited<ReturnType<typeof readWithModel>> | null, readAt: number): IntakeSession {
   const seq = s.transcript.length + 1;
   const userItem = item('user', text, seq, turnId);
   if (s.phase === 'mini_practice' || practice) {
     const next: IntakeSession = { ...s, transcript: [...s.transcript, userItem, item('coach', 'Thank you. Here is what I heard. Please check the numbers before we continue.', seq + 1)], practiceTurnId: turnId, phase: 'review' };
     return { ...next, assessment: assessText(next, text) };
   }
-  const extraction = extractFromUtterance(text, { asked: s.askedField as AskedField, profile: s.profile, pending: s.pending, lastMoneyField: lastMoneyField(s) });
+  const fromModel = reading && s.revision === readAt ? extractionFromModel(reading, text, extractContext(s)) : null;
+  const extraction: Extraction = fromModel ?? extractFromUtterance(text, extractContext(s));
   const applied = applyExtraction({ ...s, transcript: [...s.transcript, userItem] }, extraction, turnId);
-  const reply = coachReply(applied.profile, extraction, seq);
+  const reply = coachReply(applied.profile, extraction, seq, fromModel?.ack ?? null);
   const phase = extraction.wantsEnd ? 'review' : reply.asked === 'mini_practice' && !extraction.clarification ? 'mini_practice' : 'interviewing';
   return { ...applied, transcript: [...applied.transcript, item('coach', reply.text, seq + 1)], askedField: reply.asked, phase };
 }
@@ -247,12 +272,13 @@ export async function submitPracticeAudio(deps: PlatformDeps, ownerId: string, i
   return view(deps, updated);
 }
 
+/**
+ * A read only returns what is stored. The text practice is refined (and saved) when it is posted;
+ * refining and saving again here bumped the intake revision behind the open review page, so every
+ * edit, tick and Confirm there failed with VERSION_CONFLICT.
+ */
 export async function getAssessment(deps: PlatformDeps, ownerId: string, id: string): Promise<IntakeAssessment | null> {
-  let session = await intakeStore(deps).readOwned(id, ownerId);
-  if (session.assessment && !session.assessment.speechAvailable && session.assessment.practiceText && deps.models.available && !session.assessment.stale) {
-    const refined = await refineWithModel(deps, session, session.assessment);
-    if (refined !== session.assessment) session = (await intakeStore(deps).update(id, (s) => ({ ...s, assessment: refined }))).session;
-  }
+  const session = await intakeStore(deps).readOwned(id, ownerId);
   return session.assessment;
 }
 
@@ -512,13 +538,15 @@ export const VideoTurnSchema = z.object({ providerEpoch: z.number().int(), itemI
  */
 export async function videoTurn(deps: PlatformDeps, ownerId: string, id: string, input: z.infer<typeof VideoTurnSchema>): Promise<{ intake: IntakeView; reply: string | null }> {
   const store = intakeStore(deps);
-  await store.readOwned(id, ownerId);
+  const current = await store.readOwned(id, ownerId);
   const turnId = `vt_${input.itemId}`;
+  const live = current.mode === 'video' && current.providerEpoch === input.providerEpoch && current.phase === 'interviewing' && !current.transcript.some((t) => t.turnId === turnId);
+  const reading = live ? await readWithModel(deps, input.text, extractContext(current)) : null;
   const { session } = await store.update(id, (s) => {
     if (s.mode !== 'video' || s.providerEpoch !== input.providerEpoch || s.mediaStatus === 'closed' || s.mediaStatus === 'stopping') return null;
     if (s.phase !== 'interviewing' && s.phase !== 'mini_practice') return null;
     if (s.transcript.some((t) => t.turnId === turnId)) return null;
-    return { ...coachTurn(s, input.text, turnId, false), mediaStatus: 'active' };
+    return { ...coachTurn(s, input.text, turnId, false, reading, current.revision), mediaStatus: 'active' };
   });
   const index = session.transcript.findIndex((t) => t.turnId === turnId);
   const next = index >= 0 ? session.transcript[index + 1] : undefined;

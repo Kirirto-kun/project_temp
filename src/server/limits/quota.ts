@@ -3,7 +3,7 @@ import { ApiError } from '../http';
 import { utcDay } from '../ids';
 import type { KeyValueStore } from '../storage/kv';
 
-export type QuotaKind = 'session' | 'intake' | 'baseline' | 'upload' | 'analysis' | 'voice_token' | 'custom' | 'offer' | 'checkout' | 'intake_message';
+export type QuotaKind = 'session' | 'intake' | 'baseline' | 'upload' | 'analysis' | 'voice_token' | 'custom' | 'offer' | 'checkout' | 'intake_message' | 'round_video' | 'speech_in' | 'speech_out';
 
 export const DEFAULT_LIMITS: Record<QuotaKind, number> = {
   session: 3,
@@ -16,6 +16,10 @@ export const DEFAULT_LIMITS: Record<QuotaKind, number> = {
   offer: 4,
   checkout: 6,
   intake_message: 80,
+  /** Paid avatar video calls in practice rounds (each connect or reconnect). */
+  round_video: 6,
+  speech_in: 60,
+  speech_out: 200,
 };
 
 function secondsUntilUtcMidnight(now: Date): number {

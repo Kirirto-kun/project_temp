@@ -63,6 +63,31 @@ export function recordResult(debrief: Debrief): void {
 }
 
 /**
+ * "Add to my plan" on a debrief: queues the practised conversation once. A replay of the same
+ * round updates the existing entry instead of adding a second one.
+ */
+export function addDebriefToPlan(debrief: Debrief): boolean {
+  const plan = loadPlan();
+  const sameRound = new Set(plan.results.filter((r) => r.replayRootId === debrief.replayRootId).map((r) => r.sessionId));
+  sameRound.add(debrief.sessionId).add(debrief.replayRootId);
+  const existing = plan.conversations.find((c) => c.lastSessionId !== null && sameRound.has(c.lastSessionId));
+  if (existing) {
+    if (existing.lastSessionId === debrief.sessionId) return true;
+    return savePlan({ ...plan, conversations: plan.conversations.map((c) => (c === existing ? { ...c, lastSessionId: debrief.sessionId } : c)) });
+  }
+  const label = debrief.kind === 'custom' ? 'Conversation' : `${debrief.kind.charAt(0).toUpperCase()}${debrief.kind.slice(1)} conversation`;
+  const entry: PlannedConversation = {
+    id: crypto.randomUUID(),
+    kind: debrief.kind as ScenarioKind,
+    date: null,
+    description: `${label} with your ${debrief.counterpartRole.toLowerCase()}`.slice(0, 200),
+    lastSessionId: debrief.sessionId,
+    status: 'planned',
+  };
+  return savePlan({ ...plan, conversations: [...plan.conversations, entry] });
+}
+
+/**
  * Simulated gains: for each original round only the best attempt counts, grouped by period so
  * yearly pay, monthly rent and one-time bills are never added into one number.
  */

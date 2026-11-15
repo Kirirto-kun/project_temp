@@ -16,7 +16,7 @@ export const POST = route('polar.webhook', async (request) => {
     raw,
     { id: request.headers.get('webhook-id'), timestamp: request.headers.get('webhook-timestamp'), signature: request.headers.get('webhook-signature') },
     polar.webhookSecret,
-    polar.productId,
+    Object.values(polar.products),
   );
   return json({ received: true, result }, { status: 202 });
 });

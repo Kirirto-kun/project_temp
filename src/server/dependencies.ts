@@ -19,6 +19,7 @@ import type { PlatformDeps } from './platform';
 import { MemoryKV, UpstashKV, type KeyValueStore } from './storage/kv';
 import { MemoryAudioStore, S3AudioStore, type AudioStore } from './voice/audio-store';
 import { ElevenLabsScribe } from './voice/scribe';
+import { createSpeechClients } from './speech/clients';
 
 interface Singletons {
   kv: KeyValueStore | null;
@@ -82,7 +83,16 @@ export function getDeps(): PlatformDeps {
   const models = capabilities.modelAssist ? modelPortsFromEnv(process.env, undefined, spend) : NO_MODEL;
   const quota = new Quota({
     kv,
-    limits: { ...DEFAULT_LIMITS, session: env.sessionsPerIpPerDay, intake: env.intakeAttemptsPerIpPerDay },
+    limits: {
+      ...DEFAULT_LIMITS,
+      session: env.sessionsPerIpPerDay,
+      intake: env.intakeAttemptsPerIpPerDay,
+      intake_message: env.intakeMessagesPerIpPerDay,
+      baseline: env.voiceBaselinesPerIpPerDay,
+      upload: env.audioUploadsPerIpPerDay,
+      speech_in: env.speechInputsPerIpPerDay,
+      speech_out: env.speechOutputsPerIpPerDay,
+    },
     demoPool: env.demoPool ? { isMember: async (ownerId) => (await kv.get(`demo:${ownerId}`)) === '1', size: env.demoPool.sessions } : null,
   });
   const deps: PlatformDeps = {
@@ -98,6 +108,7 @@ export function getDeps(): PlatformDeps {
     audio,
     scribe: env.elevenlabs && capabilities.voiceAnalysis ? new ElevenLabsScribe(env.elevenlabs.apiKey, env.elevenlabs.sttModel) : null,
     elevenlabs: env.elevenlabs?.agentId && capabilities.voice ? new ElevenLabsAgentCredentials(env.elevenlabs.apiKey, env.elevenlabs.agentId) : null,
+    speech: env.elevenlabs && (capabilities.speechInput || capabilities.speechOutput) ? createSpeechClients(env.elevenlabs) : null,
     polar: env.polar && capabilities.payments ? new PolarApi(env.polar.accessToken, env.polar.server) : null,
     liveAvatar: env.liveAvatar && capabilities.avatarIntake ? createLiveAvatar(env.liveAvatar) : null,
     schedule,

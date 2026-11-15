@@ -1,9 +1,12 @@
 'use client';
 
 import { CircleAlert, FastForward, Flag } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiClientError } from '@/client/api/client';
+import { markTextInteraction } from '@/client/voice/speech';
+import { useSpeaker, type SpokenLine } from '@/client/voice/useSpeaker';
 import { CoachMark } from '@/components/holdline/Avatar';
+import { ReplayButton, SpeakerToggle } from '@/components/holdline/SpeechControls';
 import { cn } from '@/components/ui/cn';
 import { TextComposer } from '@/features/session/TextComposer';
 import type { IntakeView } from '../contracts';
@@ -11,8 +14,18 @@ import { sendMessage, skipPractice, stopIntake } from '../client/api';
 import { PracticeRecorder } from './PracticeRecorder';
 import { ProfileSoFar } from './ProfileSoFar';
 
-/** The conversation with Alex. Lines already on screen at load stay still; only new ones animate in. */
-export function Captions({ view, typing = false }: { view: IntakeView; typing?: boolean }) {
+type Speaker = ReturnType<typeof useSpeaker>;
+
+/** Alex's lines as read-aloud targets; the server looks up each line's text itself. */
+export function coachLines(view: IntakeView): SpokenLine[] {
+  return view.committedTranscript.filter((t) => t.role === 'coach').map((t) => ({ id: t.turnId, text: t.text, target: { kind: 'intake', id: view.id, turnId: t.turnId } }));
+}
+
+/**
+ * The conversation with Alex. Lines already on screen at load stay still; only new ones animate in.
+ * With a `speaker` (the text chat only), Alex's lines get a read-aloud button.
+ */
+export function Captions({ view, typing = false, speaker }: { view: IntakeView; typing?: boolean; speaker?: Speaker }) {
   const endRef = useRef<HTMLLIElement | null>(null);
   const [initial] = useState(() => new Set(view.committedTranscript.map((t) => t.turnId)));
   useEffect(() => {
@@ -25,7 +38,10 @@ export function Captions({ view, typing = false }: { view: IntakeView; typing?: 
           const you = t.role === 'user';
           return (
             <li key={t.turnId} className={cn('flex max-w-[86%] flex-col gap-1.5', you ? 'items-end self-end' : 'items-start', !initial.has(t.turnId) && (you ? 'msg-in msg-in-you' : 'msg-in'))}>
-              <span className="label px-1">{you ? 'You' : 'Alex · AI coach'}</span>
+              <span className="label flex items-center gap-1 px-1">
+                {you ? 'You' : 'Alex · AI coach'}
+                {!you && speaker && <ReplayButton speaker={speaker} line={{ id: t.turnId, text: t.text, target: { kind: 'intake', id: view.id, turnId: t.turnId } }} />}
+              </span>
               <div className={cn('px-4 py-3 text-[15.5px] leading-[1.5]', you ? 'bubble-you' : 'bubble-them')}>{t.text}</div>
             </li>
           );
@@ -51,6 +67,14 @@ export function TextCoach({ view, onView }: { view: IntakeView; onView: (v: Inta
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const practising = view.phase === 'mini_practice';
+  // Keep the reply box in view, not only the newest line: on phones the sticky composer would cover that line.
+  const columnRef = useRef<HTMLDivElement | null>(null);
+  const lineCount = view.committedTranscript.length;
+  const spoken = useMemo(() => coachLines(view), [view]);
+  const speaker = useSpeaker(spoken);
+  useEffect(() => {
+    columnRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+  }, [lineCount, busy]);
 
   async function send(text: string): Promise<boolean> {
     setError(null);
@@ -68,7 +92,7 @@ export function TextCoach({ view, onView }: { view: IntakeView; onView: (v: Inta
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-      <div className="grid gap-5">
+      <div ref={columnRef} className="grid gap-5 sm:scroll-mb-6">
         <div className="card flex items-center gap-3 p-3 pr-4">
           <CoachMark size={48} speaking={busy} />
           <div className="mr-auto leading-tight">
@@ -78,9 +102,10 @@ export function TextCoach({ view, onView }: { view: IntakeView; onView: (v: Inta
             </div>
             <div className="mt-1 text-[13px] text-muted">{busy ? 'Thinking…' : practising ? 'Practise your opening line' : 'AI practice coach'}</div>
           </div>
+          <SpeakerToggle speaker={speaker} />
           <span className="badge hidden sm:inline-flex">Text call</span>
         </div>
-        <Captions view={view} typing={busy} />
+        <Captions view={view} typing={busy} speaker={speaker} />
         <div aria-live="polite" className="sr-only">
           {view.committedTranscript.at(-1)?.role === 'coach' ? view.committedTranscript.at(-1)!.text : ''}
         </div>
@@ -91,7 +116,7 @@ export function TextCoach({ view, onView }: { view: IntakeView; onView: (v: Inta
           </p>
         )}
         <div className="sticky bottom-0 z-10 -mx-4 grid gap-2 bg-[linear-gradient(to_top,var(--paper)_75%,transparent)] px-4 pb-[calc(12px+env(safe-area-inset-bottom,0px))] pt-4 sm:static sm:mx-0 sm:bg-none sm:p-0">
-          <TextComposer disabled={busy} onSend={send} placeholder={practising ? 'Say your opening line, with the number.' : 'Type your answer'} />
+          <TextComposer disabled={busy} onSend={send} speech={{ kind: 'intake', id: view.id }} placeholder={practising ? 'Say your opening line, with the number.' : 'Type your answer'} />
           <div className="flex flex-wrap gap-1">
             {practising ? (
               <>
@@ -102,7 +127,12 @@ export function TextCoach({ view, onView }: { view: IntakeView; onView: (v: Inta
               </>
             ) : (
               <>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => void send('skip')} disabled={busy}>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
+                    markTextInteraction();
+                    void send('skip');
+                  }}
+                  disabled={busy}
+                >
                   <FastForward size={15} strokeWidth={2} aria-hidden /> Skip this question
                 </button>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={async () => onView(await stopIntake(view.id, 'end'))}>

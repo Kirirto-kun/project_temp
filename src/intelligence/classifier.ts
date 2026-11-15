@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { MOVE_TYPES, MoveSchema, type CoreState, type Move, type MoveType, type ScenarioConfig, type SessionState, type Tone, type TurnInput } from '@/contracts/domain';
 import { formatMoney, isBetter } from '@/domain/money';
-import { applyBasisPoints, parsePercents, resolveAmounts } from '@/domain/money-parse';
+import { applyBasisPoints, parseAmounts, parsePercents, resolveAmounts, resolveScenarioAmount } from '@/domain/money-parse';
 import type { ModelPorts } from './ports';
 import { callStructured } from './structured';
 
@@ -14,8 +14,13 @@ const SILENCE = /^\s*(\.{2,}|…+|\(\s*(silence|pause|says nothing|stays silent|
 const ULTIMATUM =
   /\b(take it or leave it|final offer|non-?negotiable|last chance|or i('| a|')?m (out|leaving|walking)|or i('ll| will)? (walk|leave|quit|resign|go)|(start|begin|keep) looking elsewhere|look(ing)? elsewhere|i('ll| will) (have to )?(leave|quit|resign|walk away|walk)|i have (another|a competing|a better) offer|otherwise i('ll| will)|or else|that'?s my (final|last) (number|offer)|i('ll| will) find (another|a new) (job|place|apartment|provider))\b/i;
 const ACCEPT =
-  /\b(deal|i accept|i'll accept|i will accept|i can accept|i'll take it|i will take it|i'll take that|sounds good|that works|works for me|agreed|let'?s do it|let'?s go with (that|it)|i agree|you have a deal|we have a deal|i'm happy with that|i am happy with that|fine by me|count me in|shake on it)\b/i;
-const CONCEDE_HINT = /\b(go down|come down|go lower|settle|meet (you )?(in the )?middle|lower my|i could do|i can do|i'd take|i would take|how about|instead|compromise|i can live with|drop to|move to)\b/i;
+  /\b(i accept|i'll accept|i will accept|i can accept|i'll take it|i will take it|i'll take that|sounds good|that works|works for me|let'?s do it|let'?s go with (that|it)|i agree|it'?s a deal|you have a deal|we have a deal|i'm happy with that|i am happy with that|fine by me|count me in|shake on it)\b|^\s*(ok(ay)?|yes|yeah|fine|alright|great)?[\s,.!]*(deal|agreed)[\s.!]*$/i;
+const NOT_ACCEPT = /\b(not|don'?t|doesn'?t|can'?t|cannot|won'?t|never|no)\b[^.?!]{0,30}\b(deal|accept|agree|works?|sounds? good|take (it|that))\b/i;
+/** Wording that refuses a quoted number or sets it against something else: "$99,250 is too low", "I can't accept $99,250". */
+const PUSHBACK = /\b(not|no|never|cannot|too|but|still|only|low|high|little|bad|expensive|below|above|under|over|less|more|than|short of)\b|n['’]t\b/i;
+/** Wording that agrees to a number the reply names: "I'll take $99,250", "$99,250 is fine", "ok, 99,250". */
+const AGREE_HINT =
+  /^\s*(deal|agreed)\b|^\s*(ok(ay)?|fine|alright|sure|yes|yeah|yep)[\s,.!-]*(then[\s,]*)?\$?\d[\d,.]*k?[\s.!]*$|\b(i'?ll take|i will take|i'?d take|i would take|i can live with|let'?s (do|go with|settle on|say)|settle (for|on|at))\b|\b(is|would be|sounds|it'?s) (fine|ok(ay)?|good|great|acceptable)\b|\bworks\b|\bit is( then)?[\s.!]*$/i;
 const REASON =
   /\b(because|since|given that|considering|as i |due to|i (led|lead|built|shipped|delivered|grew|saved|launched|increased|reduced|cut|closed|mentored|own|manage|managed|handled|took over|took on|run|ran|automated|migrated|rebuilt|rewrote|designed|onboarded|trained|doubled|tripled|won|negotiated)|my (results|track record|impact|performance|work|scope|responsibilit|reviews?|role has)|market (rate|data|range|value)|data (shows|says)|levels\.fyi|glassdoor|benchmark|comparable|similar (roles|units|apartments|plans)|other (companies|landlords|providers|offers) (pay|charge|offer)|on[- ]time|as a result|promot|scope (has )?grown|years? of experience|paid (on time|every month)|loyal customer|been a customer|competitor|cheaper elsewhere|top of the (team|range|band))\b/i;
 const QUESTION_START = /^\s*(what|why|how|when|where|who|which|could you|can you|would you|will you|is there|are there|do you|does|did you|what's|whats|is it|can we talk about|help me understand)\b/i;
@@ -24,6 +29,8 @@ const AGGRESSIVE = /\b(ridiculous|insult(ing)?|joke|unacceptable|absurd|pathetic
 const ASSERTIVE = /\b(i'?m asking for|i am asking for|i need|i expect|my number is|i want|i'd like|i would like|i propose|i'm proposing|my ask is)\b/i;
 
 const PERCENT_MONEY_CONTEXT = /\b(pay|salary|raise|compensation|comp|rent|price|rate|bill|offer|base|increase|bump|discount|more|less|off|lower|cheaper|reduction)\b/i;
+const RELATIVE_UP = /\b(raise|more|extra|increase|bump|on top)\b/i;
+const RELATIVE_DOWN = /\b(off|less|lower|discount|reduction|reduce|cheaper)\b/i;
 const PERCENT_METRIC_CONTEXT = /\b(cut|reduced|grew|grown|improved|boosted|saved|shipped|delivered|churn|latency|incidents?|revenue|conversion|retention|users|traffic|errors?|costs? by)\b/i;
 
 export function detectTone(text: string): Tone {
@@ -41,6 +48,20 @@ export function hasReason(text: string): boolean {
 export function amountCandidates(text: string, config: ScenarioConfig, state: CoreState): AmountCandidate[] {
   const reference = config.currentMinor;
   const out: AmountCandidate[] = resolveAmounts(text, reference).map((amountMinor) => ({ amountMinor, source: 'stated' as const }));
+  // Relative asks: "a $15,000 raise", "$30 off my bill", "$200 less per month".
+  for (const a of parseAmounts(text)) {
+    // Only an opening ask: once a number is on record, "$5,000 more" refers to the offer, not to current pay.
+    if (state.userLastMinor !== null) break;
+    if (a.currency && a.currency !== 'USD') continue;
+    if (!(a.explicitMagnitude || a.hasCurrencySign) || a.valueMinor >= reference / 2) continue;
+    const clause = text.slice(Math.max(0, a.start - 25), Math.min(text.length, a.end + 25));
+    if (!(config.objective === 'maximize' ? RELATIVE_UP : RELATIVE_DOWN).test(clause)) continue;
+    const value = config.objective === 'maximize' ? reference + a.valueMinor : reference - a.valueMinor;
+    const absolute = resolveScenarioAmount(a, reference);
+    const index = out.findIndex((c) => c.amountMinor === absolute);
+    if (index >= 0) out.splice(index, 1);
+    if (value > 0 && !out.some((c) => c.amountMinor === value)) out.push({ amountMinor: value, source: 'stated' });
+  }
   for (const percent of parsePercents(text)) {
     const clause = text.slice(Math.max(0, percent.start - 40), Math.min(text.length, percent.end + 40));
     if (!PERCENT_MONEY_CONTEXT.test(clause) || PERCENT_METRIC_CONTEXT.test(clause)) continue;
@@ -80,18 +101,21 @@ export function classifyByRules(text: string, config: ScenarioConfig, state: Cor
 
   if (SILENCE.test(raw)) return make('hold_silence');
   if (ULTIMATUM.test(raw)) return make('ultimatum', amount);
-  if (ACCEPT.test(raw) && !/\?\s*$/.test(raw)) {
+  if (state.lastAction?.kind === 'concede' && /^\s*(yes|yep|yeah|ok(ay)?|sure|fine|alright|all right|accepted|let'?s do that)([\s,.!]+(yes|ok(ay)?|fine|sure|thanks|thank you))*[\s.!]*$/i.test(raw)) return make('accept');
+  if (ACCEPT.test(raw) && !NOT_ACCEPT.test(raw) && !/\?\s*$/.test(raw)) {
     const differs = candidates.some((c) => c.amountMinor !== state.offerMinor);
     if (!differs) return make('accept');
   }
+  const question = /\?\s*$/.test(raw) || QUESTION_START.test(raw);
   if (candidates.length > 0) {
-    if (amount !== null && state.userLastMinor !== null && isBetter(config.objective, state.userLastMinor, amount)) return make('concede', amount);
-    if (amount !== null && CONCEDE_HINT.test(raw) && state.userLastMinor !== null && amount !== state.userLastMinor && isBetter(config.objective, state.userLastMinor, amount)) {
-      return make('concede', amount);
-    }
-    return make('state_number', amount);
+    const lowers = amount !== null && state.userLastMinor !== null && isBetter(config.objective, state.userLastMinor, amount);
+    // A number that is no better for the user than the offer already on the table is not a new ask:
+    // the reply either refuses that number ("$99,250 is too low") or agrees to it ("I'll take $99,250").
+    const withinOffer = lowers && state.offerMinor !== null && !isBetter(config.objective, amount, state.offerMinor);
+    if (!withinOffer) return make(lowers ? 'concede' : 'state_number', amount);
+    if (!question && !PUSHBACK.test(raw) && (ACCEPT.test(raw) || AGREE_HINT.test(raw))) return make('accept');
   }
-  if (/\?\s*$/.test(raw) || QUESTION_START.test(raw)) return make('ask_question');
+  if (question) return make('ask_question');
   if (reason) return make('justify');
   return make('offtopic');
 }
@@ -138,6 +162,26 @@ export interface ClassifyOptions {
  * once and then becomes `offtopic`; an unavailable provider falls back to the rules.
  */
 export async function classifyMove(input: TurnInput, context: SessionState, deps: ModelPorts, options: ClassifyOptions = {}): Promise<Move> {
+  return withoutRepeatCredit(await classifyFresh(input, context, deps, options), input.text, context);
+}
+
+/** Letters and digits only, so a reply typed or pasted again compares equal. */
+function replyKey(text: string): string {
+  return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+/**
+ * A reply the user already sent in this round earns no second credit: its reason was counted
+ * the first time. A repeated reason becomes `offtopic`, a repeated reasoned ask loses the reason.
+ */
+function withoutRepeatCredit(move: Move, text: string, context: SessionState): Move {
+  if (move.type !== 'justify' && !(move.type === 'state_number' && move.hasReason)) return move;
+  const key = replyKey(text);
+  if (!key || !context.turns.some((turn) => replyKey(turn.input.text) === key)) return move;
+  return move.type === 'justify' ? { ...move, type: 'offtopic', hasReason: false } : { ...move, hasReason: false };
+}
+
+async function classifyFresh(input: TurnInput, context: SessionState, deps: ModelPorts, options: ClassifyOptions): Promise<Move> {
   const config = context.scenarioSnapshot;
   const state = context.state;
   const text = input.text.trim();

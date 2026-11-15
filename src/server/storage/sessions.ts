@@ -31,17 +31,16 @@ export class SessionRepo {
    * null to leave the stored state unchanged.
    */
   async update(id: string, mutate: (current: SessionState) => SessionState | null): Promise<{ session: SessionState; written: boolean }> {
-    let ttl = 60;
     const result = await updateJson<SessionState>(
       this.kv,
       key(id),
       (current) => {
         if (!current) return null;
-        ttl = ttlFor(current, this.now());
         const next = mutate(current);
         return next ? { ...next, version: current.version + 1 } : null;
       },
-      { ttlSeconds: ttl },
+      // Computed per write from startedAt; a number captured before `mutate` ran made every update expire in 60s.
+      { ttlSeconds: (next) => ttlFor(next, this.now()) },
     );
     if (!result.value) throw new Error('Session disappeared during update');
     return { session: result.value, written: result.written };

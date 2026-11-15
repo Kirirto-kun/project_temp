@@ -17,7 +17,7 @@ export function LandingStats({ exampleLeftMinor, examplePeriod }: { exampleLeftM
   const gains: { period: Period; totalMinor: number; rounds: number }[] | null = useMemo(() => (hydrated ? simulatedGains(loadPlan().results) : null), [hydrated]);
   const has = gains !== null && gains.length > 0;
   return (
-    <section className="mx-auto w-full max-w-[1120px] px-4" aria-labelledby="proof">
+    <section className="page-col" aria-labelledby="proof">
       <div className="grid gap-8 rounded-[32px] bg-raised p-6 shadow-[var(--shadow-raise)] sm:p-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:items-center">
         <div>
           <p className="eyebrow m-0">Proof</p>

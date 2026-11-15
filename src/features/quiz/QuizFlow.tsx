@@ -8,6 +8,7 @@ import { applyMoneyPercent, suggestPracticeRange, validatePracticeDraft } from '
 import { formatMoney } from '@/domain/money';
 import type { DraftState } from '@/client/storage/draft';
 import { CoachMark } from '@/components/holdline/Avatar';
+import { ChoiceCard } from '@/components/ui/ChoiceCard';
 import { ScreenSkeleton } from '@/components/ui/skeleton';
 import { StepTransition } from '@/components/ui/step-transition';
 import { useDraft } from '@/features/setup/useDraft';
@@ -107,6 +108,7 @@ export function QuizFlow() {
 
   function chooseKind(next: StandardKind) {
     const periods = allowedPeriodsForKind(next);
+    const salaryNext = next === 'raise' || next === 'offer';
     setDirection(1);
     setState((s) =>
       s
@@ -116,14 +118,19 @@ export function QuizFlow() {
             marketUnknown: false,
             practiceRangeConfirmed: false,
             avatarId: null,
+            intake: null,
             draft: {
               ...s.draft,
+              // A different kind starts clean: amounts, worry and salary-only answers do not carry over.
+              ...(s.draft.kind !== next
+                ? { currentMinor: undefined, targetMinor: undefined, fear: '', description: '', conversationDate: null, userRole: salaryNext ? s.draft.userRole : undefined }
+                : {}),
               kind: next,
               period: periods[0],
               counterpartRole: COUNTERPART_ROLES[next]![0],
               currency: 'USD',
               inputMode: 'personal',
-              moneyBasis: s.draft.moneyBasis ?? 'unspecified',
+              moneyBasis: salaryNext ? (s.draft.moneyBasis ?? 'unspecified') : 'unspecified',
               marketLowMinor: undefined,
               marketHighMinor: undefined,
               rangeSource: undefined,
@@ -168,6 +175,7 @@ export function QuizFlow() {
       setError(validation.errors[0]?.message ?? `Missing: ${validation.missingFields.join(', ')}`);
       return;
     }
+    setState((s) => (s ? { ...s, intake: null } : s));
     router.push('/result');
   }
 
@@ -181,26 +189,21 @@ export function QuizFlow() {
         {step === 0 && (
           <section aria-labelledby="q-kind" className="grid gap-6">
             <StepHeader step={0} id="q-kind" title="What are you negotiating?" sub="Pick one. You can change it later." />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-2.5 sm:grid-cols-2">
               {KIND_TILES.map((tile) => {
                 const meta = KIND_META[tile.kind];
                 const Icon = meta.icon;
                 return (
-                  <button
+                  <ChoiceCard
                     key={tile.kind}
-                    type="button"
-                    aria-pressed={state.draft.kind === tile.kind}
-                    onClick={() => chooseKind(tile.kind)}
-                    className="option min-h-[148px] flex-col items-start justify-between gap-6 !p-4 sm:!p-5"
-                  >
-                    <span className="grid h-11 w-11 place-items-center rounded-[14px] bg-hold-tint text-hold-text" aria-hidden>
-                      <Icon size={22} strokeWidth={1.75} />
-                    </span>
-                    <span className="grid gap-0.5">
-                      <span className="text-[17px] font-semibold tracking-[-0.015em]">{tile.title}</span>
-                      <span className="text-[13px] font-normal text-muted">{meta.hint}</span>
-                    </span>
-                  </button>
+                    mode="toggle"
+                    selected={state.draft.kind === tile.kind}
+                    onSelect={() => chooseKind(tile.kind)}
+                    leading={<Icon size={20} strokeWidth={1.75} />}
+                    title={tile.title}
+                    description={meta.hint}
+                    className="min-h-16"
+                  />
                 );
               })}
             </div>
@@ -212,9 +215,7 @@ export function QuizFlow() {
             <StepHeader step={1} id="q-role" title="Who will you be speaking with?" />
             <div className="grid gap-2.5" role="radiogroup" aria-labelledby="q-role">
               {COUNTERPART_ROLES[kind]!.map((role) => (
-                <button key={role} type="button" role="radio" aria-checked={state.draft.counterpartRole === role} className="option" onClick={() => update({ counterpartRole: role })}>
-                  {role}
-                </button>
+                <ChoiceCard key={role} selected={state.draft.counterpartRole === role} onSelect={() => update({ counterpartRole: role })} title={role} />
               ))}
             </div>
             {salary && (
@@ -235,9 +236,7 @@ export function QuizFlow() {
             {kind === 'bill' && (
               <div className="grid grid-cols-2 gap-2.5" role="radiogroup" aria-label="How often">
                 {(['month', 'one_time'] as const).map((p) => (
-                  <button key={p} type="button" role="radio" aria-checked={period === p} className="option" onClick={() => update({ period: p })}>
-                    {p === 'month' ? 'Every month' : 'One-time'}
-                  </button>
+                  <ChoiceCard key={p} selected={period === p} onSelect={() => update({ period: p })} title={p === 'month' ? 'Every month' : 'One-time'} />
                 ))}
               </div>
             )}
@@ -247,9 +246,14 @@ export function QuizFlow() {
                 <legend className="mb-2 text-[15px] font-semibold">Before or after tax?</legend>
                 <div className="grid grid-cols-3 gap-2">
                   {(['gross', 'net', 'unspecified'] as MoneyBasis[]).map((b) => (
-                    <button key={b} type="button" aria-pressed={state.draft.moneyBasis === b} className="option option-center !min-h-12 !px-3 text-[14px]" onClick={() => update({ moneyBasis: b })}>
-                      {b === 'gross' ? 'Before tax' : b === 'net' ? 'After tax' : 'Not sure'}
-                    </button>
+                    <ChoiceCard
+                      key={b}
+                      mode="toggle"
+                      compact
+                      selected={state.draft.moneyBasis === b}
+                      onSelect={() => update({ moneyBasis: b })}
+                      title={b === 'gross' ? 'Before tax' : b === 'net' ? 'After tax' : 'Not sure'}
+                    />
                   ))}
                 </div>
               </fieldset>
@@ -308,14 +312,12 @@ export function QuizFlow() {
                 <MoneyField label="High end" size="md" valueMinor={state.draft.marketHighMinor} period={period} salaryScale={salary} onChange={(v) => update({ marketHighMinor: v })} />
               </div>
             )}
-            <button
-              type="button"
-              className="option"
-              aria-pressed={state.marketUnknown}
-              onClick={() => update({ marketLowMinor: undefined, marketHighMinor: undefined, rangeSource: undefined }, { marketUnknown: !state.marketUnknown, practiceRangeConfirmed: false })}
-            >
-              I don’t know the range
-            </button>
+            <ChoiceCard
+              mode="toggle"
+              selected={state.marketUnknown}
+              onSelect={() => update({ marketLowMinor: undefined, marketHighMinor: undefined, rangeSource: undefined }, { marketUnknown: !state.marketUnknown, practiceRangeConfirmed: false })}
+              title="I don’t know the range"
+            />
             {state.marketUnknown && practiceRange && (
               <div className="card pop-in grid gap-4 p-5">
                 <span className="badge w-fit">Practice assumption — not a market estimate</span>

@@ -10,8 +10,10 @@ export const dynamic = 'force-dynamic';
 export const POST = route('polar.checkout', async (request) => {
   const { deps, visitor } = mutationContext(request);
   idempotencyKey(request);
-  await readBody(request, CheckoutRequestSchema);
+  const body = await readBody(request, CheckoutRequestSchema);
   const polar = serverEnv().polar;
   if (!polar) throw new ApiError('FEATURE_DISABLED', 'Payments are not enabled.');
-  return json(await createCheckout(deps, visitor.ownerId, visitor.ipHash, polar.productId), { status: 201, headers: visitor.headers });
+  const productId = polar.products[body.plan];
+  if (!productId) throw new ApiError('FEATURE_DISABLED', 'This plan cannot be bought here yet.');
+  return json(await createCheckout(deps, visitor.ownerId, visitor.ipHash, productId), { status: 201, headers: visitor.headers });
 });

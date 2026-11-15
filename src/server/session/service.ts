@@ -23,6 +23,7 @@ import { bodyHash, newId } from '../ids';
 import type { PlatformDeps } from '../platform';
 import { readJson } from '../storage/kv';
 import { SessionRepo, turnLockKey } from '../storage/sessions';
+import { closeRoundVideo } from './round-video-store';
 import { toSessionView } from './view';
 
 const TURN_LOCK_SECONDS = 30;
@@ -37,9 +38,14 @@ export async function loadOwnedSession(deps: PlatformDeps, sessionId: string, ow
   return session;
 }
 
-/** Applies the server deadline: a session past its 5 minutes is finished as timeout. */
+/**
+ * Applies the server deadline: a session past its 5 minutes is finished as timeout, and any avatar
+ * video call still open for it is stopped and settled (also when the round ended earlier).
+ */
 export async function enforceDeadline(deps: PlatformDeps, session: SessionState): Promise<SessionState> {
-  if (session.state.ended || deps.now().getTime() < new Date(session.deadlineAt).getTime()) return session;
+  if (deps.now().getTime() < new Date(session.deadlineAt).getTime()) return session;
+  await closeRoundVideo(deps, session.id).catch(() => false);
+  if (session.state.ended) return session;
   const { session: updated } = await sessionRepo(deps).update(session.id, (current) =>
     current.state.ended ? null : { ...current, state: finishSession(current.state, 'timeout'), activeMode: current.activeMode, voiceBindingId: null },
   );
@@ -262,6 +268,7 @@ export async function finishSessionByUser(deps: PlatformDeps, sessionId: string,
   const { session: updated } = await sessionRepo(deps).update(sessionId, (current) =>
     current.state.ended ? null : { ...current, state: finishSession(current.state, 'stopped'), voiceBindingId: null },
   );
+  await closeRoundVideo(deps, sessionId).catch(() => false);
   return toSessionView(updated);
 }
 

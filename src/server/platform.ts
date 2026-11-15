@@ -10,6 +10,7 @@ import type { ScribeClient } from './voice/scribe';
 import type { ElevenLabsAgentClient } from './elevenlabs/credentials';
 import type { PolarClient } from './payments/polar';
 import type { LiveAvatarClient } from '@/onboarding/server/liveavatar';
+import type { SpeechClients } from './speech/clients';
 
 /** Port the first-call vertical (D) implements for the platform. */
 export interface IntakePort {
@@ -33,6 +34,8 @@ export interface PlatformDeps {
   audio: AudioStore | null;
   scribe: ScribeClient | null;
   elevenlabs: ElevenLabsAgentClient | null;
+  /** Dictation and read-aloud for the text chats; null when the capability is off. */
+  speech: SpeechClients | null;
   polar: PolarClient | null;
   liveAvatar: LiveAvatarClient | null;
   /** Runs work after the response is sent (Next.js after()); tests run it inline. */

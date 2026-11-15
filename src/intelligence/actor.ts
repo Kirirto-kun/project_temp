@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { CoreState, CounterpartAction, Move, ScenarioConfig, SessionState } from '@/contracts/domain';
 import { formatMoney } from '@/domain/money';
-import { OPENINGS, TEMPLATES, pick } from '@/scenarios/reply-templates';
+import { OPENINGS, pick, templatesFor } from '@/scenarios/reply-templates';
 import { UNREALISTIC_SHARE } from '@/engine';
 import { utility } from '@/domain/money';
 import { AMOUNT_PLACEHOLDER, containsNumberLike, fillAmount, onlyAllowedAmounts } from './money-guard';
@@ -30,7 +30,7 @@ function isOutOfRange(config: ScenarioConfig, move: Move): boolean {
 /** Deterministic, always-safe counterpart line for an engine action. */
 export function templateReply(action: CounterpartAction, ctx: ActorContext): string {
   const config = ctx.session.scenarioSnapshot;
-  const t = TEMPLATES[config.persona.archetype];
+  const t = templatesFor(config.persona.archetype, config.objective);
   const seed = ctx.next.turn;
   const money = (minor: number) => formatMoney(minor, config.period);
   switch (action.kind) {

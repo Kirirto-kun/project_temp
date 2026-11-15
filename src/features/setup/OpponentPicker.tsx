@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { StandardKind } from '@/contracts/domain';
 import { Avatar } from '@/components/holdline/Avatar';
+import { ChoiceCard } from '@/components/ui/ChoiceCard';
 import { ScreenSkeleton } from '@/components/ui/skeleton';
 import { ARCHETYPE_LABELS, AVATAR_CARDS } from '@/content/avatars';
 import { useDraft } from './useDraft';
@@ -38,29 +39,24 @@ export function OpponentPicker() {
         <h1 className="h-title m-0">Who will you practise against?</h1>
         <p className="m-0 text-[15px] leading-6 text-muted">Each one says no differently. The numbers come from your range either way.</p>
       </header>
-      <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Counterparts">
+      <div className="grid gap-2.5 sm:grid-cols-2" role="radiogroup" aria-label="Counterparts">
         {cards.map((card, i) => {
           const selected = state.avatarId === card.avatarId;
           return (
-            <button
+            <ChoiceCard
               key={card.avatarId}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              className="option pop-in !items-start gap-4 !p-4 sm:!p-5"
+              selected={selected}
+              onSelect={() => setState({ ...state, avatarId: card.avatarId })}
+              align="start"
+              leading={<Avatar avatarId={card.avatarId} size={44} />}
+              title={card.name}
+              description={`${card.role} · ${card.tenure}`}
+              className="pop-in gap-3.5 p-4"
               style={{ ['--delay' as string]: `${Math.round(120 * (1 - Math.pow(0.7, i)))}ms` }}
-              onClick={() => setState({ ...state, avatarId: card.avatarId })}
             >
-              <Avatar avatarId={card.avatarId} size={64} />
-              <span className="grid min-w-0 gap-1.5">
-                <span className="text-[17px] font-semibold tracking-[-0.015em]">{card.name}</span>
-                <span className="text-[13.5px] leading-5 text-muted">
-                  {card.role} · {card.tenure}
-                </span>
-                <span className="badge badge-hold mt-1 w-fit">{ARCHETYPE_LABELS[card.archetype].title}</span>
-                <span className="mt-1 text-[14px] font-normal leading-5 text-ink-soft">{card.style}</span>
-              </span>
-            </button>
+              <span className="mt-1.5 text-[12.5px] font-medium leading-4 text-hold-text">{ARCHETYPE_LABELS[card.archetype].title}</span>
+              <span className="mt-1 text-[14px] font-normal leading-5 text-ink-soft">{card.style}</span>
+            </ChoiceCard>
           );
         })}
       </div>

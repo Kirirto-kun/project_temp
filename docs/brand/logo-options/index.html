@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Holdline logo options</title>
+<style>
+  :root { --violet: #5b42f3; --violet-dark: #6e57ff; --ink: #110e24; --muted: #6b6785; --line: rgba(17,14,36,.08); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f8f7fc; color: var(--ink); font: 15px/1.5 Geist, Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; }
+  main { max-width: 1120px; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { font-size: 32px; letter-spacing: -.035em; margin: 0 0 6px; }
+  h2 { font-size: 22px; letter-spacing: -.03em; margin: 0; }
+  p { margin: 0; color: var(--muted); max-width: 70ch; }
+  .option { margin-top: 40px; display: grid; gap: 14px; }
+  .option header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .pick { font-size: 12px; font-weight: 600; color: #fff; background: var(--violet); border-radius: 999px; padding: 2px 10px; }
+  .panels { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+  .panel { border-radius: 20px; padding: 24px; display: grid; gap: 20px; box-shadow: 0 0 0 1px var(--line); }
+  .light { background: #fff; color: var(--ink); --tile: var(--violet); --knock: #fff; --glyph: var(--violet); }
+  .dark { background: #0b0916; color: #f4f2ff; --tile: var(--violet-dark); --knock: #fff; --glyph: var(--violet-dark); box-shadow: none; }
+  .mono.light { --tile: currentColor; --knock: #fff; --glyph: currentColor; }
+  .mono.dark { --tile: currentColor; --knock: #0b0916; --glyph: currentColor; }
+  .tag { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: inherit; opacity: .6; }
+  .sizes { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; }
+  .sizes figure { margin: 0; display: grid; justify-items: center; gap: 6px; }
+  .sizes figcaption { font-size: 12px; opacity: .55; }
+  .lockups { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 32px; }
+  .lockup { display: inline-flex; align-items: center; gap: .32em; font-weight: 700; letter-spacing: -.04em; line-height: 1; }
+  .nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: 14px; box-shadow: 0 0 0 1px rgba(127,127,160,.25); font-size: 14px; }
+  .nav span:last-child { opacity: .6; }
+  svg { display: block; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="a" viewBox="0 0 32 32">
+      <rect width="32" height="32" rx="8" fill="var(--tile)"/>
+      <rect x="9" y="8" width="4" height="16" rx="2" fill="var(--knock)"/>
+      <rect x="19" y="8" width="4" height="16" rx="2" fill="var(--knock)"/>
+      <rect x="4.5" y="13.5" width="23" height="3" rx="1.5" fill="var(--knock)"/>
+    </symbol>
+    <symbol id="b" viewBox="0 0 32 32">
+      <rect width="32" height="32" rx="8" fill="var(--tile)"/>
+      <path d="M10 9.5l6 5.5 6-5.5" fill="none" stroke="var(--knock)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M8.5 21.5h15" fill="none" stroke="var(--knock)" stroke-width="4" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="c" viewBox="0 0 32 32">
+      <path d="M14.5 6.5a11 11 0 0 0 0 22z" fill="var(--glyph)"/>
+      <path d="M17.5 3.5a11 11 0 0 1 0 22z" fill="var(--glyph)"/>
+    </symbol>
+  </defs>
+</svg>
+
+<main>
+  <h1>Holdline logo options</h1>
+  <p>Three marks, each shown at 24, 32 and 64px, in brand colour and in one-colour (monochrome) form, on light and dark. Wordmark: the site's display sans (Geist, bold, tight tracking), never monospace. Option A is the one implemented in <code>src/components/holdline/Logo.tsx</code> and <code>src/app/icon.svg</code>.</p>
+  <section class="option" aria-labelledby="opt-a">
+      <header><h2 id="opt-a">A. Crossline</h2><span class="pick">Implemented</span><a href="option-a-crossline.svg">option-a-crossline.svg</a></header>
+      <p>Two posts, the two sides of the table, and one line that runs through both and past them. It reads as an H for Holdline and as a line held level across the gap. Pure rectangles, so it stays crisp at 16 to 20px and works as a favicon.</p>
+      <div class="panels">
+        
+    <div class="panel light">
+      <span class="tag">Light</span>
+      <div class="sizes"><figure><svg width="24" height="24" aria-hidden="true"><use href="#a"/></svg><figcaption>24px</figcaption></figure><figure><svg width="32" height="32" aria-hidden="true"><use href="#a"/></svg><figcaption>32px</figcaption></figure><figure><svg width="64" height="64" aria-hidden="true"><use href="#a"/></svg><figcaption>64px</figcaption></figure></div>
+      <div class="lockups">
+        <span class="lockup" style="font-size:17px"><svg width="24" height="24" aria-hidden="true"><use href="#a"/></svg>Holdline</span>
+        <span class="lockup" style="font-size:22px"><svg width="32" height="32" aria-hidden="true"><use href="#a"/></svg>Holdline</span>
+      </div>
+      <div class="nav"><span class="lockup" style="font-size:16px"><svg width="24" height="24" aria-hidden="true"><use href="#a"/></svg>Holdline</span><span>Practice · Counterparts · My plan · Pricing</span></div>
+    </div>
+        
+    <div class="panel dark">
+      <span class="tag">Dark</span>
+      <div class="sizes"><figure><svg width="24" height="24" aria-hidden="true"><use href="#a"/></svg><figcaption>24px</figcaption></figure><figure><svg width="32" height="32" aria-hidden="true"><use href="#a"/></svg><figcaption>32px</figcaption></figure><figure><svg width="64" height="64" aria-hidden="true"><use href="#a"/></svg><figcaption>64px</figcaption></figure></div>
+      <div class="lockups">
+        <span class="lockup" style="font-size:17px"><svg width="24" height="24" aria-hidden="true"><use href="#a"/></svg>Holdline</span>
+        <span class="lockup" style="font-size:22px"><svg width="32" height="32" aria-hidden="true"><use href="#a"/></svg>Holdline</span>
+      </div>
+      <div class="nav"><span class="lockup" style="font-size:16px"><svg width="24" height="24" aria-hidden="true"><use href="#a"/></svg>Holdline</span><span>Practice · Counterparts · My plan · Pricing</span></div>
+    </div>
+        
+    <div class="panel mono light">
+      <span class="tag">Monochrome, light</span>
+      <div class="sizes"><figure><svg width="24" height="24" aria-hidden="true"><use href="#a"/></svg><figcaption>24px</figcaption></figure><figure><svg width="32" height="32" aria-hidden="true"><use href="#a"/></svg><figcaption>32px</figcaption></figure><figure><svg width="64" height="64" aria-hidden="true"><use href="#a"/></svg><figcaption>64px</figcaption></figure></div>
+      <div class="lockups">
+        <span class="lockup" style="font-size:17px"><svg width="24" height="24" aria-hidden="true"><use href="#a"/></svg>Holdline</span>
+        <span class="lockup" style="font-size:22px"><svg width="32" height="32" aria-hidden="true"><use href="#a"/></svg>Holdline</span>
+      </div>
+      <div class="nav"><span class="lockup" style="font-size:16px"><svg width="24" height="24" aria-hidden="true"><use href="#a"/></svg>Holdline</span><span>Practice · Counterparts · My plan · Pricing</span></div>
+    </div>
+        
+    <div class="panel mono dark">
+      <span class="tag">Monochrome, dark</span>
+      <div class="sizes"><figure><svg width="24" height="24" aria-hidden="true"><use href="#a"/></svg><figcaption>24px</figcaption></figure><figure><svg width="32" height="32" aria-hidden="true"><use href="#a"/></svg><figcaption>32px</figcaption></figure><figure><svg width="64" height="64" aria-hidden="true"><use href="#a"/></svg><figcaption>64px</figcaption></figure></div>
+      <div class="lockups">
+        <span class="lockup" style="font-size:17px"><svg width="24" height="24" aria-hidden="true"><use href="#a"/></svg>Holdline</span>
+        <span class="lockup" style="font-size:22px"><svg width="32" height="32" aria-hidden="true"><use href="#a"/></svg>Holdline</span>
+      </div>
+      <div class="nav"><span class="lockup" style="font-size:16px"><svg width="24" height="24" aria-hidden="true"><use href="#a"/></svg>Holdline</span><span>Practice · Counterparts · My plan · Pricing</span></div>
+    </div>
+      </div>
+    </section>
+    <section class="option" aria-labelledby="opt-b">
+      <header><h2 id="opt-b">B. Floor</h2><a href="option-b-floor.svg">option-b-floor.svg</a></header>
+      <p>Pressure comes down (the chevron) and stops short of a flat bar: your floor. Clear metaphor, but the downward chevron can read as "dropdown" or "less" next to UI controls.</p>
+      <div class="panels">
+        
+    <div class="panel light">
+      <span class="tag">Light</span>
+      <div class="sizes"><figure><svg width="24" height="24" aria-hidden="true"><use href="#b"/></svg><figcaption>24px</figcaption></figure><figure><svg width="32" height="32" aria-hidden="true"><use href="#b"/></svg><figcaption>32px</figcaption></figure><figure><svg width="64" height="64" aria-hidden="true"><use href="#b"/></svg><figcaption>64px</figcaption></figure></div>
+      <div class="lockups">
+        <span class="lockup" style="font-size:17px"><svg width="24" height="24" aria-hidden="true"><use href="#b"/></svg>Holdline</span>
+        <span class="lockup" style="font-size:22px"><svg width="32" height="32" aria-hidden="true"><use href="#b"/></svg>Holdline</span>
+      </div>
+      <div class="nav"><span class="lockup" style="font-size:16px"><svg width="24" height="24" aria-hidden="true"><use href="#b"/></svg>Holdline</span><span>Practice · Counterparts · My plan · Pricing</span></div>
+    </div>
+        
+    <div class="panel dark">
+      <span class="tag">Dark</span>
+      <div class="sizes"><figure><svg width="24" height="24" aria-hidden="true"><use href="#b"/></svg><figcaption>24px</figcaption></figure><figure><svg width="32" height="32" aria-hidden="true"><use href="#b"/></svg><figcaption>32px</figcaption></figure><figure><svg width="64" height="64" aria-hidden="true"><use href="#b"/></svg><figcaption>64px</figcaption></figure></div>
+      <div class="lockups">
+        <span class="lockup" style="font-size:17px"><svg width="24" height="24" aria-hidden="true"><use href="#b"/></svg>Holdline</span>
+        <span class="lockup" style="font-size:22px"><svg width="32" height="32" aria-hidden="true"><use href="#b"/></svg>Holdline</span>
+      </div>
+      <div class="nav"><span class="lockup" style="font-size:16px"><svg width="24" height="24" aria-hidden="true"><use href="#b"/></svg>Holdline</span><span>Practice · Counterparts · My plan · Pricing</span></div>
+    </div>
+        
+    <div class="panel mono light">
+      <span class="tag">Monochrome, light</span>
+      <div class="sizes"><figure><svg width="24" height="24" aria-hidden="true"><use href="#b"/></svg><figcaption>24px</figcaption></figure><figure><svg width="32" height="32" aria-hidden="true"><use href="#b"/></svg><figcaption>32px</figcaption></figure><figure><svg width="64" height="64" aria-hidden="true"><use href="#b"/></svg><figcaption>64px</figcaption></figure></div>
+      <div class="lockups">
+        <span class="lockup" style="font-size:17px"><svg width="24" height="24" aria-hidden="true"><use href="#b"/></svg>Holdline</span>
+        <span class="lockup" style="font-size:22px"><svg width="32" height="32" aria-hidden="true"><use href="#b"/></svg>Holdline</span>
+      </div>
+      <div class="nav"><span class="lockup" style="font-size:16px"><svg width="24" height="24" aria-hidden="true"><use href="#b"/></svg>Holdline</span><span>Practice · Counterparts · My plan · Pricing</span></div>
+    </div>
+        
+    <div class="panel mono dark">
+      <span class="tag">Monochrome, dark</span>
+      <div class="sizes"><figure><svg width="24" height="24" aria-hidden="true"><use href="#b"/></svg><figcaption>24px</figcaption></figure><figure><svg width="32" height="32" aria-hidden="true"><use href="#b"/></svg><figcaption>32px</figcaption></figure><figure><svg width="64" height="64" aria-hidden="true"><use href="#b"/></svg><figcaption>64px</figcaption></figure></div>
+      <div class="lockups">
+        <span class="lockup" style="font-size:17px"><svg width="24" height="24" aria-hidden="true"><use href="#b"/></svg>Holdline</span>
+        <span class="lockup" style="font-size:22px"><svg width="32" height="32" aria-hidden="true"><use href="#b"/></svg>Holdline</span>
+      </div>
+      <div class="nav"><span class="lockup" style="font-size:16px"><svg width="24" height="24" aria-hidden="true"><use href="#b"/></svg>Holdline</span><span>Practice · Counterparts · My plan · Pricing</span></div>
+    </div>
+      </div>
+    </section>
+    <section class="option" aria-labelledby="opt-c">
+      <header><h2 id="opt-c">C. Split step</h2><a href="option-c-split.svg">option-c-split.svg</a></header>
+      <p>One disc split into two sides, one holding a step higher. No tile, so it sits lighter in text. Most abstract of the three; at 20px the gap closes up and it reads as a blob.</p>
+      <div class="panels">
+        
+    <div class="panel light">
+      <span class="tag">Light</span>
+      <div class="sizes"><figure><svg width="24" height="24" aria-hidden="true"><use href="#c"/></svg><figcaption>24px</figcaption></figure><figure><svg width="32" height="32" aria-hidden="true"><use href="#c"/></svg><figcaption>32px</figcaption></figure><figure><svg width="64" height="64" aria-hidden="true"><use href="#c"/></svg><figcaption>64px</figcaption></figure></div>
+      <div class="lockups">
+        <span class="lockup" style="font-size:17px"><svg width="24" height="24" aria-hidden="true"><use href="#c"/></svg>Holdline</span>
+        <span class="lockup" style="font-size:22px"><svg width="32" height="32" aria-hidden="true"><use href="#c"/></svg>Holdline</span>
+      </div>
+      <div class="nav"><span class="lockup" style="font-size:16px"><svg width="24" height="24" aria-hidden="true"><use href="#c"/></svg>Holdline</span><span>Practice · Counterparts · My plan · Pricing</span></div>
+    </div>
+        
+    <div class="panel dark">
+      <span class="tag">Dark</span>
+      <div class="sizes"><figure><svg width="24" height="24" aria-hidden="true"><use href="#c"/></svg><figcaption>24px</figcaption></figure><figure><svg width="32" height="32" aria-hidden="true"><use href="#c"/></svg><figcaption>32px</figcaption></figure><figure><svg width="64" height="64" aria-hidden="true"><use href="#c"/></svg><figcaption>64px</figcaption></figure></div>
+      <div class="lockups">
+        <span class="lockup" style="font-size:17px"><svg width="24" height="24" aria-hidden="true"><use href="#c"/></svg>Holdline</span>
+        <span class="lockup" style="font-size:22px"><svg width="32" height="32" aria-hidden="true"><use href="#c"/></svg>Holdline</span>
+      </div>
+      <div class="nav"><span class="lockup" style="font-size:16px"><svg width="24" height="24" aria-hidden="true"><use href="#c"/></svg>Holdline</span><span>Practice · Counterparts · My plan · Pricing</span></div>
+    </div>
+        
+    <div class="panel mono light">
+      <span class="tag">Monochrome, light</span>
+      <div class="sizes"><figure><svg width="24" height="24" aria-hidden="true"><use href="#c"/></svg><figcaption>24px</figcaption></figure><figure><svg width="32" height="32" aria-hidden="true"><use href="#c"/></svg><figcaption>32px</figcaption></figure><figure><svg width="64" height="64" aria-hidden="true"><use href="#c"/></svg><figcaption>64px</figcaption></figure></div>
+      <div class="lockups">
+        <span class="lockup" style="font-size:17px"><svg width="24" height="24" aria-hidden="true"><use href="#c"/></svg>Holdline</span>
+        <span class="lockup" style="font-size:22px"><svg width="32" height="32" aria-hidden="true"><use href="#c"/></svg>Holdline</span>
+      </div>
+      <div class="nav"><span class="lockup" style="font-size:16px"><svg width="24" height="24" aria-hidden="true"><use href="#c"/></svg>Holdline</span><span>Practice · Counterparts · My plan · Pricing</span></div>
+    </div>
+        
+    <div class="panel mono dark">
+      <span class="tag">Monochrome, dark</span>
+      <div class="sizes"><figure><svg width="24" height="24" aria-hidden="true"><use href="#c"/></svg><figcaption>24px</figcaption></figure><figure><svg width="32" height="32" aria-hidden="true"><use href="#c"/></svg><figcaption>32px</figcaption></figure><figure><svg width="64" height="64" aria-hidden="true"><use href="#c"/></svg><figcaption>64px</figcaption></figure></div>
+      <div class="lockups">
+        <span class="lockup" style="font-size:17px"><svg width="24" height="24" aria-hidden="true"><use href="#c"/></svg>Holdline</span>
+        <span class="lockup" style="font-size:22px"><svg width="32" height="32" aria-hidden="true"><use href="#c"/></svg>Holdline</span>
+      </div>
+      <div class="nav"><span class="lockup" style="font-size:16px"><svg width="24" height="24" aria-hidden="true"><use href="#c"/></svg>Holdline</span><span>Practice · Counterparts · My plan · Pricing</span></div>
+    </div>
+      </div>
+    </section>
+</main>
+
+</body>
+</html>

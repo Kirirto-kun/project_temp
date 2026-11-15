@@ -1,3 +1,4 @@
+import { PLANS } from '@/content/plans';
 import { CONTRACT_VERSION, LIMITS } from '@/contracts/domain';
 import { INTAKE_CONTRACT_VERSION } from '@/contracts/intake';
 import type { ConfigResponse } from '@/contracts/api';
@@ -18,6 +19,7 @@ export const GET = route('config', async () => {
     sessionLimitSeconds: LIMITS.sessionLimitSeconds,
     intakeLimitSeconds: LIMITS.intakeLimitSeconds,
     paidProduct: deps.capabilities.payments && env.polar ? { productKey: 'conversation_pack', priceMinor: env.polar.priceMinor, currency: 'USD', billing: 'one_time' } : null,
+    paidPlans: deps.capabilities.payments && env.polar ? PLANS.map((plan) => plan.key).filter((key) => Boolean(env.polar?.products[key])) : [],
   };
   return json(body);
 });

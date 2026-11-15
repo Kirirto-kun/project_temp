@@ -65,6 +65,10 @@ export const CapabilitiesSchema = z.object({
   coachVoice: z.boolean(),
   visualIntake: z.boolean(),
   modelAssist: z.boolean(),
+  /** Server dictation (speech-to-text) for the text chats. Without it the browser recognizer is used where available. */
+  speechInput: z.boolean(),
+  /** Server read-aloud (text-to-speech) of the other side's lines in the text chats. */
+  speechOutput: z.boolean(),
 });
 export type Capabilities = z.infer<typeof CapabilitiesSchema>;
 
@@ -77,6 +81,8 @@ export const ConfigResponseSchema = z.object({
   paidProduct: z
     .object({ productKey: z.literal('conversation_pack'), priceMinor: z.number().int(), currency: z.literal('USD'), billing: z.literal('one_time') })
     .nullable(),
+  /** Plans on /pricing that have a checkout on this deployment. Empty when payments are off. */
+  paidPlans: z.array(z.enum(['trial', 'monthly', 'annual'])).default([]),
 });
 export type ConfigResponse = z.infer<typeof ConfigResponseSchema>;
 
@@ -176,7 +182,8 @@ export const AnalyzeRequestSchema = z.object({ sessionId: z.string().min(1), aud
 export const AnalyzeResponseSchema = z.object({ analysisId: z.string(), status: z.literal('pending') });
 export const AnalysisResponseSchema = z.object({ analysisId: z.string(), metrics: VoiceMetricsSchema });
 
-export const CheckoutRequestSchema = z.object({ productKey: z.literal('conversation_pack') });
+export const PlanKeySchema = z.enum(['trial', 'monthly', 'annual']);
+export const CheckoutRequestSchema = z.object({ plan: PlanKeySchema });
 export const CheckoutResponseSchema = z.object({ checkoutUrl: z.string(), checkoutId: z.string() });
 
 export const EntitlementResponseSchema = z.object({
@@ -220,3 +227,23 @@ export const OfferAnalysisSchema = z.object({
 });
 export type OfferAnalysis = z.infer<typeof OfferAnalysisSchema>;
 export const OfferAnalyzeResponseSchema = z.object({ analysis: OfferAnalysisSchema });
+
+/** Text-chat dictation and read-aloud. Audio is processed in memory and never stored. */
+export const SPEECH_LIMITS = { maxClipSeconds: 30, maxClipBytes: 2 * 1024 * 1024, maxSpokenChars: 600 } as const;
+
+/** Which conversation a dictated clip belongs to; the server checks the owner. */
+export const SpeechContextSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('intake'), id: z.string().min(1).max(80) }).strict(),
+  z.object({ kind: z.literal('round'), sessionId: z.string().min(1).max(80) }).strict(),
+]);
+export type SpeechContext = z.infer<typeof SpeechContextSchema>;
+
+/** A line the server already said. The server reads its own text; arbitrary text is never accepted. */
+export const SpeakRequestSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('intake'), id: z.string().min(1).max(80), turnId: z.string().min(1).max(120) }).strict(),
+  z.object({ kind: z.literal('round'), sessionId: z.string().min(1).max(80), messageId: z.string().min(1).max(200) }).strict(),
+]);
+export type SpeakRequest = z.infer<typeof SpeakRequestSchema>;
+
+export const TranscribeResponseSchema = z.object({ text: z.string() });
+export type TranscribeResponse = z.infer<typeof TranscribeResponseSchema>;

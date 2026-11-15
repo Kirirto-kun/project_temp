@@ -5,8 +5,9 @@
 | Practice round | 5 minutes from start, 20 turns | Server deadline + engine `maxTurns` |
 | New rounds and replays | `SESSIONS_PER_IP_PER_DAY` (default 3) per IP per UTC day | `Quota('session')` |
 | Coach audio calls | `INTAKE_ATTEMPTS_PER_IP_PER_DAY` (default 3), 5 minutes each | `Quota('intake')` |
-| Coach text messages | 80 per IP per day | `Quota('intake_message')` |
-| Calibrations / uploads / analyses / voice tokens | 6 / 20 / 6 / 12 per IP per day | `DEFAULT_LIMITS` |
+| Coach text messages | `INTAKE_MESSAGES_PER_IP_PER_DAY` (default 2000) per IP per day | `Quota('intake_message')` |
+| Voice calibrations / audio uploads | `VOICE_BASELINES_PER_IP_PER_DAY` (default 6) / `AUDIO_UPLOADS_PER_IP_PER_DAY` (default 20) per IP per day | `Quota('baseline')`, `Quota('upload')` |
+| Analyses / voice tokens | 6 / 12 per IP per day | `DEFAULT_LIMITS` |
 | Jury pool | `DEMO_POOL_SESSIONS` extra rounds per day after `POST /api/demo/claim` with `DEMO_POOL_TOKEN` | Share the token privately; no public query parameter |
 
 Spend: every paid call reserves an upper-bound cost from the daily ceiling before it runs and is

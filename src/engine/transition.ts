@@ -1,5 +1,5 @@
 import type { CoreState, CounterpartAction, Move, ScenarioConfig } from '@/contracts/domain';
-import { stepToward, utility, worse } from '@/domain/money';
+import { better, stepToward, utility, worse } from '@/domain/money';
 import { clampMeter, openObjections } from './state';
 
 export interface TransitionResult {
@@ -100,6 +100,11 @@ export function applyMove(config: ScenarioConfig, state: CoreState, move: Move):
       const open = firstOpen(config, draft);
       if (move.hasReason) {
         draft.trust += 3;
+        // A reasoned ask in reply to an objection answers it, the same way a bare reason does.
+        if (state.lastAction?.kind === 'object' && clearFirstMatching(config, draft, 'justify')) {
+          action = concedeAction(config, draft, move.amountMinor, step);
+          break;
+        }
         action = open ? { kind: 'object', objectionId: open.id } : concedeAction(config, draft, move.amountMinor, step);
       } else {
         draft.patience -= 2;
@@ -111,6 +116,9 @@ export function applyMove(config: ScenarioConfig, state: CoreState, move: Move):
       if (clearFirstMatching(config, draft, 'justify')) {
         draft.trust += 2;
         action = concedeAction(config, draft, draft.userLastMinor, step);
+      } else if (draft.userLastMinor !== null) {
+        // Nothing left to clear: a further reason earns half a step (whole dollars) toward the standing ask.
+        action = concedeAction(config, draft, draft.userLastMinor, Math.max(100, Math.floor(step / 200) * 100));
       } else {
         action = { kind: 'hold' };
       }
@@ -131,10 +139,12 @@ export function applyMove(config: ScenarioConfig, state: CoreState, move: Move):
       }
       const reachableUtility = Math.min(utility(config.objective, offer) + step, utility(config.objective, config.reservationAmountMinor));
       if (utility(config.objective, ask) <= reachableUtility) {
+        // Never close at a number worse for the user than the offer already on the table.
+        const close = better(config.objective, ask, offer);
         draft.ended = 'accepted';
-        draft.agreedMinor = ask;
-        draft.offerMinor = ask;
-        action = { kind: 'accept', atMinor: ask };
+        draft.agreedMinor = close;
+        draft.offerMinor = close;
+        action = { kind: 'accept', atMinor: close };
       } else {
         action = { kind: 'hold' };
       }

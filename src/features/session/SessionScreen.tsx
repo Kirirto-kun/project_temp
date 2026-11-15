@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { ArrowRight, Flag, Loader2, Timer } from 'lucide-react';
+import { ArrowRight, Flag, Loader2, Timer, Video } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -22,6 +22,7 @@ import { Transcript, type PendingLine } from './Transcript';
 import { formatClock, useCountdown } from './useCountdown';
 
 const VoicePanel = dynamic(() => import('./VoicePanel'), { ssr: false, loading: () => <div className="skeleton h-[120px] rounded-[20px]" aria-hidden /> });
+const RoundVideoCall = dynamic(() => import('./RoundVideoCall'), { ssr: false, loading: () => <div className="skeleton aspect-video rounded-[16px]" aria-hidden /> });
 
 export function SessionScreen({ id }: { id: string }) {
   const router = useRouter();
@@ -33,12 +34,17 @@ export function SessionScreen({ id }: { id: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<'none' | 'uploading' | 'started' | 'skipped' | 'failed'>('none');
   const [deltas, setDeltas] = useState<{ patience: number; trust: number } | null>(null);
+  /** The user chose to type, or the video call failed: the round continues in text. */
+  const [videoOff, setVideoOff] = useState(false);
   const previous = useRef<SessionView | null>(null);
+  /** The newest accepted view, read by the video call between turns. */
+  const latest = useRef<SessionView | null>(null);
   const left = useCountdown(session?.deadlineAt ?? null);
 
   const accept = useCallback((view: SessionView) => {
     setSession((current) => {
       if (current && current.version > view.version) return current;
+      latest.current = view;
       const before = previous.current;
       if (before && view.turn > before.turn) setDeltas({ patience: view.patience - before.patience, trust: view.trust - before.trust });
       previous.current = view;
@@ -68,35 +74,56 @@ export function SessionScreen({ id }: { id: string }) {
     if (left === 0 && session && !session.ended) void getSession(id).then(accept).catch(() => undefined);
   }, [left, session, id, accept]);
 
-  async function send(text: string): Promise<boolean> {
-    if (!session) return false;
+  // Keep the reply box (or the end-of-round card) in view, not only the newest line.
+  const columnRef = useRef<HTMLDivElement | null>(null);
+  const followed = useRef(false);
+  const lineCount = session ? session.messages.length + (pending ? 1 : 0) + (tentative ? 1 : 0) : null;
+  const roundOver = session ? session.ended !== null : false;
+  useEffect(() => {
+    if (lineCount === null) return;
+    // Follow changes only; on load the scoreboard above the chat stays in view.
+    if (!followed.current) {
+      followed.current = true;
+      return;
+    }
+    columnRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+  }, [lineCount, roundOver]);
+
+  /** One round turn with retries; resolves with the committed view, or null (the notice says why). */
+  async function submit(text: string): Promise<{ view: SessionView; turnId: string } | null> {
+    const base = latest.current ?? session;
+    if (!base) return null;
     const turnId = newClientId('turn');
     setNotice(null);
     setPending({ id: turnId, role: 'user', text, tentative: false });
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        const result = await sendTurn({ sessionId: session.id, turnId, expectedVersion: session.version, text });
+        const result = await sendTurn({ sessionId: base.id, turnId, expectedVersion: base.version, text });
         accept(result.session);
         setPending(null);
-        return true;
+        return { view: result.session, turnId };
       } catch (error) {
         if (error instanceof ApiClientError && error.code === 'NETWORK' && attempt < 2) {
           await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
           continue; // same turnId: the server returns the stored result if it already committed
         }
-        const fresh = await getSession(session.id).catch(() => null);
+        const fresh = await getSession(base.id).catch(() => null);
         if (fresh) accept(fresh);
         setPending(null);
-        if (fresh?.messages.some((m) => m.turnId === turnId)) return true;
+        if (fresh?.messages.some((m) => m.turnId === turnId)) return { view: fresh, turnId };
         if (error instanceof ApiClientError) {
           if (error.code === 'SESSION_ENDED') setNotice('The round has ended.');
           else if (error.code === 'VERSION_CONFLICT' || error.code === 'TURN_IN_PROGRESS') setNotice('The round moved on. Your reply was not sent; read the latest message and send it again.');
           else setNotice(error.message);
         }
-        return false;
+        return null;
       }
     }
-    return false;
+    return null;
+  }
+
+  async function send(text: string): Promise<boolean> {
+    return (await submit(text)) !== null;
   }
 
   async function stop() {
@@ -128,29 +155,33 @@ export function SessionScreen({ id }: { id: string }) {
   const counterpartLabel = `Your ${s.counterpartRole.toLowerCase()}`;
   const ended = session.ended !== null;
   const urgent = left !== null && left < 60 && !ended;
+  // The video call with the counterpart replaces the header card; video or ElevenLabs voice, never both.
+  const showVideo = Boolean(caps?.avatarIntake) && !ended && !videoOff && session.activeMode === 'text';
 
   return (
     <div className="grid gap-5">
-      <header className="card flex items-center gap-3 p-3 pr-4 sm:gap-4">
-        <Avatar avatarId={s.persona.avatarId} size={52} label={`${s.persona.name}, ${s.persona.role}`} speaking={typing} />
-        <div className="mr-auto min-w-0 leading-tight">
-          <div className="truncate text-[16px] font-semibold tracking-[-0.01em]">{s.persona.name}</div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted">
-            <span className="truncate">{s.persona.role}</span>
-            <span className="badge badge-hold">{ARCHETYPE_LABELS[s.persona.archetype].title}</span>
+      {!showVideo && (
+        <header className="card flex items-center gap-3 p-3 pr-4 sm:gap-4">
+          <Avatar avatarId={s.persona.avatarId} size={52} label={`${s.persona.name}, ${s.persona.role}`} speaking={typing} />
+          <div className="mr-auto min-w-0 leading-tight">
+            <div className="truncate text-[16px] font-semibold tracking-[-0.01em]">{s.persona.name}</div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted">
+              <span className="truncate">{s.persona.role}</span>
+              <span className="badge badge-hold">{ARCHETYPE_LABELS[s.persona.archetype].title}</span>
+            </div>
           </div>
-        </div>
-        <div className={cn('flex shrink-0 items-center gap-2 rounded-full px-3 py-2 transition-colors duration-300', urgent ? 'bg-gap-tint text-gap' : 'bg-sunken text-ink-soft')}>
-          {urgent ? <span className="live-dot" aria-hidden /> : <Timer size={15} strokeWidth={2} aria-hidden />}
-          <span className="sr-only">Time left</span>
-          <span className="mono text-[15px] font-medium" aria-live="off">
-            {left === null ? '–' : formatClock(left)}
-          </span>
-        </div>
-      </header>
+          <div className={cn('flex shrink-0 items-center gap-2 rounded-full px-3 py-2 transition-colors duration-300', urgent ? 'bg-gap-tint text-gap' : 'bg-sunken text-ink-soft')}>
+            {urgent ? <span className="live-dot" aria-hidden /> : <Timer size={15} strokeWidth={2} aria-hidden />}
+            <span className="sr-only">Time left</span>
+            <span className="mono text-[15px] font-medium" aria-live="off">
+              {left === null ? '–' : formatClock(left)}
+            </span>
+          </div>
+        </header>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-        <aside className="card grid min-w-0 gap-5 p-5 lg:sticky lg:top-24 lg:order-last" aria-label="Where the round stands">
+        <aside className="card grid min-w-0 gap-5 overflow-x-clip p-5 lg:sticky lg:top-24 lg:order-last" aria-label="Where the round stands">
           <div className="min-w-0">
             <div className="label">On the table</div>
             <div className="mt-2 text-[clamp(30px,5vw,38px)] font-extrabold leading-none tracking-[-0.045em]">
@@ -177,7 +208,19 @@ export function SessionScreen({ id }: { id: string }) {
           )}
         </aside>
 
-        <div className="grid min-w-0 gap-5">
+        <div ref={columnRef} className="grid min-w-0 gap-5 sm:scroll-mb-6">
+          {showVideo && (
+            <RoundVideoCall
+              session={session}
+              current={() => latest.current}
+              turn={submit}
+              onFailed={(message) => {
+                setVideoOff(true);
+                setNotice(message);
+              }}
+              onTypeInstead={() => setVideoOff(true)}
+            />
+          )}
           <div aria-live="polite" className="sr-only">
             {session.messages.at(-1)?.role === 'counterpart' ? `${counterpartLabel}: ${session.messages.at(-1)!.text}` : ''}
           </div>
@@ -195,7 +238,7 @@ export function SessionScreen({ id }: { id: string }) {
           ) : (
             <section className="sticky bottom-0 z-10 -mx-4 grid gap-3 bg-[linear-gradient(to_top,var(--paper)_78%,transparent)] px-4 pb-[calc(12px+env(safe-area-inset-bottom,0px))] pt-5 sm:static sm:mx-0 sm:bg-none sm:p-0" aria-label="Your move">
               {session.activeMode === 'text' && <TextComposer disabled={typing} onSend={send} />}
-              {caps?.voice && (
+              {caps?.voice && !showVideo && (
                 <VoicePanel
                   session={session}
                   onSession={accept}
@@ -203,6 +246,11 @@ export function SessionScreen({ id }: { id: string }) {
                   onFallback={(reason) => setNotice(reason)}
                   onAnalysis={(status) => setAnalysis(status)}
                 />
+              )}
+              {caps?.avatarIntake && videoOff && session.activeMode === 'text' && (
+                <button type="button" className="btn btn-ghost btn-sm justify-self-start" onClick={() => setVideoOff(false)}>
+                  <Video size={14} strokeWidth={2} aria-hidden /> Back to the video call
+                </button>
               )}
               <p className="m-0 hidden text-[12.5px] leading-5 text-muted sm:block">Every number is computed by the simulation from your range. The counterpart does not know your target.</p>
             </section>

@@ -1,4 +1,5 @@
 import 'server-only';
+import type { PlanKey } from '@/content/plans';
 
 /** LiveAvatar FULL video coach: LiveAvatar hears the user and speaks our coach's replies in this voice. */
 export interface LiveAvatarEnv {
@@ -19,16 +20,24 @@ export interface ServerEnv {
   allowInsecureCookies: boolean;
   anthropicKey: string | null;
   llmProvider: string;
-  elevenlabs: { apiKey: string; agentId: string | null; customLlmSecret: string | null; sttModel: string; voiceMap: Record<string, string> } | null;
+  elevenlabs: { apiKey: string; agentId: string | null; customLlmSecret: string | null; sttModel: string; ttsModel: string; voiceMap: Record<string, string> } | null;
+  /** Dictation and read-aloud in the text chats (ElevenLabs Scribe + TTS). On with an ElevenLabs key unless TEXT_CHAT_SPEECH=off. */
+  textChatSpeech: boolean;
   openaiRealtime: { apiKey: string; model: string; voice: string } | null;
   /** Opt-in on-device body-language step (MediaPipe in the browser). Off unless VISUAL_INTAKE=1. */
   visualIntake: boolean;
   liveAvatar: LiveAvatarEnv | null;
   s3: { endpoint: string; region: string; bucket: string; accessKeyId: string; secretAccessKey: string } | null;
-  polar: { accessToken: string; webhookSecret: string; productId: string; server: 'sandbox' | 'production'; priceMinor: number } | null;
+  /** `products` maps each plan on /pricing to its Polar product; a plan without one cannot be bought. */
+  polar: { accessToken: string; webhookSecret: string; products: Partial<Record<PlanKey, string>>; server: 'sandbox' | 'production'; priceMinor: number } | null;
   dailyBudgetMicros: number | null;
   sessionsPerIpPerDay: number;
   intakeAttemptsPerIpPerDay: number;
+  intakeMessagesPerIpPerDay: number;
+  voiceBaselinesPerIpPerDay: number;
+  audioUploadsPerIpPerDay: number;
+  speechInputsPerIpPerDay: number;
+  speechOutputsPerIpPerDay: number;
   demoPool: { token: string; sessions: number } | null;
 }
 
@@ -92,7 +101,12 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
   const s3Secret = str(env.S3_SECRET_ACCESS_KEY);
   const polarToken = str(env.POLAR_ACCESS_TOKEN);
   const polarSecret = str(env.POLAR_WEBHOOK_SECRET);
-  const polarProduct = str(env.POLAR_PRODUCT_ID);
+  // POLAR_PRODUCT_PASS is the one-time 7-day trial, POLAR_PRODUCT_MEMBERSHIP the monthly plan, POLAR_PRODUCT_ANNUAL the annual plan.
+  const polarProducts: Partial<Record<PlanKey, string>> = {};
+  for (const [plan, value] of [['trial', env.POLAR_PRODUCT_PASS], ['monthly', env.POLAR_PRODUCT_MEMBERSHIP], ['annual', env.POLAR_PRODUCT_ANNUAL]] as const) {
+    const id = str(value);
+    if (id) polarProducts[plan] = id;
+  }
   const openaiKey = str(env.OPENAI_API_KEY);
   const realtimeModel = str(env.OPENAI_REALTIME_MODEL);
   const budgetUsd = Number(env.DAILY_BUDGET_USD);
@@ -115,9 +129,11 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
           agentId: str(env.ELEVENLABS_AGENT_ID),
           customLlmSecret: str(env.ELEVENLABS_CUSTOM_LLM_SECRET),
           sttModel: str(env.ELEVENLABS_STT_MODEL) ?? 'scribe_v3',
+          ttsModel: str(env.ELEVENLABS_TTS_MODEL) ?? 'eleven_flash_v2_5',
           voiceMap: parseVoiceMap(str(env.ELEVENLABS_VOICE_MAP)),
         }
       : null,
+    textChatSpeech: str(env.TEXT_CHAT_SPEECH)?.toLowerCase() !== 'off',
     openaiRealtime: openaiKey && realtimeModel ? { apiKey: openaiKey, model: realtimeModel, voice: str(env.OPENAI_REALTIME_VOICE) ?? 'marin' } : null,
     liveAvatar: readLiveAvatar(env, isProduction),
     s3:
@@ -125,12 +141,17 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
         ? { endpoint: s3Endpoint.replace(/\/$/, ''), region: str(env.S3_REGION) ?? 'auto', bucket: s3Bucket, accessKeyId: s3Key, secretAccessKey: s3Secret }
         : null,
     polar:
-      polarToken && polarSecret && polarProduct
-        ? { accessToken: polarToken, webhookSecret: polarSecret, productId: polarProduct, server: env.POLAR_SERVER === 'production' ? 'production' : 'sandbox', priceMinor: int(env.POLAR_PRICE_MINOR, 1_500) }
+      polarToken && polarSecret && Object.keys(polarProducts).length > 0
+        ? { accessToken: polarToken, webhookSecret: polarSecret, products: polarProducts, server: env.POLAR_SERVER === 'production' ? 'production' : 'sandbox', priceMinor: int(env.POLAR_PRICE_MINOR, 1_500) }
         : null,
     dailyBudgetMicros: Number.isFinite(budgetUsd) && budgetUsd > 0 ? Math.round(budgetUsd * 1_000_000) : null,
     sessionsPerIpPerDay: int(env.SESSIONS_PER_IP_PER_DAY, 3),
     intakeAttemptsPerIpPerDay: int(env.INTAKE_ATTEMPTS_PER_IP_PER_DAY, 3),
+    intakeMessagesPerIpPerDay: int(env.INTAKE_MESSAGES_PER_IP_PER_DAY, 2000),
+    voiceBaselinesPerIpPerDay: int(env.VOICE_BASELINES_PER_IP_PER_DAY, 6),
+    audioUploadsPerIpPerDay: int(env.AUDIO_UPLOADS_PER_IP_PER_DAY, 20),
+    speechInputsPerIpPerDay: int(env.SPEECH_INPUTS_PER_IP_PER_DAY, 60),
+    speechOutputsPerIpPerDay: int(env.SPEECH_OUTPUTS_PER_IP_PER_DAY, 200),
     demoPool: demoToken && demoToken.length >= 12 ? { token: demoToken, sessions: int(env.DEMO_POOL_SESSIONS, 10) } : null,
   };
 }

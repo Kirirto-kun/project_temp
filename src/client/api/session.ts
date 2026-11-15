@@ -28,6 +28,15 @@ export async function finishSession(id: string, expectedVersion: number): Promis
   return (await apiFetch<{ session: SessionView }>(`/api/session/${encodeURIComponent(id)}/finish`, { body: { expectedVersion, reason: 'stopped' } })).session;
 }
 
+/** Starts the round's avatar video call; returns a short-lived LiveAvatar session token. */
+export async function connectRoundVideo(id: string): Promise<{ sessionToken: string; providerEpoch: number }> {
+  return apiFetch(`/api/session/${encodeURIComponent(id)}/video`, { body: {} });
+}
+
+export async function stopRoundVideo(id: string, providerEpoch?: number): Promise<{ stopped: boolean }> {
+  return apiFetch(`/api/session/${encodeURIComponent(id)}/video/stop`, { body: providerEpoch === undefined ? {} : { providerEpoch } });
+}
+
 export async function setMode(id: string, expectedVersion: number, mode: TransportMode): Promise<SessionView> {
   return (await apiFetch<{ session: SessionView }>(`/api/session/${encodeURIComponent(id)}/mode`, { body: { expectedVersion, mode } })).session;
 }
@@ -68,8 +77,8 @@ export async function getEntitlement(): Promise<EntitlementResponse> {
   return apiFetch<EntitlementResponse>('/api/entitlement');
 }
 
-export async function startCheckout(): Promise<{ checkoutUrl: string; checkoutId: string }> {
-  return apiFetch('/api/polar/checkout', { body: { productKey: 'conversation_pack' }, idempotencyKey: newClientId('checkout') });
+export async function startCheckout(plan: 'trial' | 'monthly' | 'annual'): Promise<{ checkoutUrl: string; checkoutId: string }> {
+  return apiFetch('/api/polar/checkout', { body: { plan }, idempotencyKey: newClientId('checkout') });
 }
 
 export async function createCustomScenario(quiz: QuizAnswers, description: string): Promise<{ scenarioId: string }> {

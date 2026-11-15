@@ -120,6 +120,20 @@ select {
 } /* end base */
 
 @layer components {
+/* ---------------------------------------------------------------- Layout */
+
+/* The one page column. Header, main and footer all use it, so the logo, the content and the
+   right-most control share the same left and right edges. */
+.page-col {
+  width: 100%;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding-inline: var(--page-gutter);
+}
+.page-col-chat {
+  --page-max: 760px;
+}
+
 /* ---------------------------------------------------------------- Type */
 
 .eyebrow {
@@ -571,6 +585,74 @@ input[type='radio'] {
   width: 44px;
   flex-shrink: 0;
 }
+/* Dictation: the mic sits left of send; while recording it turns into a stop button. */
+.composer-mic {
+  min-height: 44px;
+  width: 44px;
+  flex-shrink: 0;
+  margin-right: -4px;
+}
+.composer-mic[data-recording] {
+  background: var(--gap);
+  color: #fff;
+}
+.composer-status {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 500 15px/20px var(--font-sans);
+  color: var(--ink);
+}
+.composer-status-cancel {
+  margin-left: auto;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.composer-status-cancel:hover {
+  color: var(--ink);
+}
+.composer-note {
+  margin: 0;
+  padding: 0 18px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+
+/* Read-aloud: a small play button next to the other side's name. */
+.speech-replay {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin: -5px 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+.speech-replay:hover,
+.speech-replay[data-playing] {
+  background: var(--hold-tint);
+  color: var(--hold);
+}
+.speech-replay:focus-visible {
+  outline: 2px solid var(--hold);
+  outline-offset: 1px;
+}
 
 /* Funnel actions: pinned to the bottom of the screen on phones, in flow on larger screens. */
 .funnel-actions {
@@ -588,82 +670,141 @@ input[type='radio'] {
   }
 }
 
-/* ---------------------------------------------------------------- Option cards */
+/* ---------------------------------------------------------------- Choice cards (ChoiceCard) */
 
-.option {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-height: 56px;
-  padding: 10px 46px 10px 16px;
-  border: 0;
-  border-radius: 16px;
-  background: var(--raised);
-  box-shadow:
-    inset 0 0 0 1px var(--line-strong),
-    var(--shadow-xs);
-  font: 500 15px/20px var(--font-sans);
-  color: var(--ink);
-  text-align: left;
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  transition:
-    transform var(--dur-press) var(--ease-out),
-    box-shadow var(--dur-fast) ease,
-    background-color var(--dur-fast) ease;
-}
-.option::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  right: 14px;
-  width: 20px;
-  height: 20px;
-  margin-top: -10px;
-  border-radius: 999px;
-  box-shadow: inset 0 0 0 1.5px var(--line-strong);
-  background-position: center;
-  background-repeat: no-repeat;
-  transition:
-    background-color var(--dur-fast) ease,
-    box-shadow var(--dur-fast) ease;
-}
-.option:active {
-  transform: scale(0.985);
-}
-@media (hover: hover) and (pointer: fine) {
-  .option:hover {
-    box-shadow:
-      inset 0 0 0 1px var(--violet-300),
-      var(--shadow-xs);
-    background: color-mix(in srgb, var(--hold-tint) 55%, var(--raised));
+/* In @layer components so Tailwind utilities on a ChoiceCard win without `!`. */
+@layer components {
+  /* Text-first rows: hairline border, brand border + tint + filled check when selected. */
+  .choice {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+    min-height: 52px;
+    padding: 12px 14px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--raised);
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+    color: var(--ink);
+    font: 500 15px/20px var(--font-sans);
+    text-align: left;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    transition:
+      box-shadow var(--dur-fast) ease,
+      background-color var(--dur-fast) ease;
   }
-}
-.option[aria-pressed='true'],
-.option[aria-checked='true'] {
-  background: var(--hold-tint);
-  box-shadow:
-    inset 0 0 0 2px var(--hold),
-    0 6px 18px -10px color-mix(in srgb, var(--hold) 60%, transparent);
-}
-.option[aria-pressed='true']::after,
-.option[aria-checked='true']::after {
-  background-color: var(--hold);
-  box-shadow: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 10.5l2.6 2.6L14 7.6'/%3E%3C/svg%3E");
-}
-.option-center {
-  justify-content: center;
-  padding-right: 16px;
-}
-.option-center::after,
-.option-bare::after {
-  display: none;
-}
-.option-bare {
-  padding-right: 16px;
+  .choice[data-align='start'] {
+    align-items: flex-start;
+  }
+  .choice:focus-visible {
+    outline: 2px solid var(--hold);
+    outline-offset: 2px;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .choice:hover {
+      background: var(--paper-subtle);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 28%, transparent);
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .choice {
+      transition:
+        transform var(--dur-press) var(--ease-out),
+        box-shadow var(--dur-fast) ease,
+        background-color var(--dur-fast) ease;
+    }
+    .choice:active {
+      transform: scale(0.98);
+    }
+  }
+  .choice[aria-pressed='true'],
+  .choice[aria-checked='true'] {
+    background: var(--hold-tint);
+    box-shadow: inset 0 0 0 1.5px var(--hold);
+  }
+
+  .choice-leading {
+    display: flex;
+    flex-shrink: 0;
+    color: var(--ink-soft);
+    transition: color var(--dur-fast) ease;
+  }
+  .choice[aria-pressed='true'] .choice-leading,
+  .choice[aria-checked='true'] .choice-leading {
+    color: var(--hold-text);
+  }
+  .choice-body {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
+  }
+  .choice-title {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .choice-desc {
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 18px;
+    color: var(--muted);
+  }
+
+  /* The trailing check keeps its slot so rows never shift when selected. */
+  .choice-check {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: var(--hold);
+    color: var(--on-hold);
+    opacity: 0;
+    transform: scale(0.6);
+    transition:
+      opacity var(--dur-fast) ease,
+      transform var(--dur-fast) var(--ease-out);
+  }
+  .choice[data-align='start'] .choice-check {
+    margin-top: 1px;
+  }
+  .choice[aria-pressed='true'] .choice-check,
+  .choice[aria-checked='true'] .choice-check {
+    opacity: 1;
+    transform: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .choice-check {
+      transform: none;
+    }
+  }
+
+  /* Short centred labels in tight grids (Before tax / Per month). */
+  .choice[data-compact] {
+    justify-content: center;
+    min-height: 48px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .choice[data-compact] .choice-body {
+    flex: 0 1 auto;
+  }
+  .choice[data-compact] .choice-title {
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .choice[data-compact][aria-pressed='true'] .choice-title,
+  .choice[data-compact][aria-checked='true'] .choice-title {
+    font-weight: 600;
+    color: var(--hold-text);
+  }
 }
 
 /* ---------------------------------------------------------------- Window cards (records) */
@@ -1293,5 +1434,51 @@ input[type='radio'] {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ---------------------------------------------------------------- Call room
+ * Meet/Zoom-style video room (CallStage). Always dark, in both site themes.
+ */
+.call-room {
+  --room-bg: #202124;
+  --room-tile: #2d2e31;
+  --room-raised: #3c4043;
+  --room-raised-hover: #4a4e52;
+  --room-danger: #ea4335;
+  --room-danger-hover: #d93025;
+  --room-ring: var(--violet-400);
+  background: var(--room-bg);
+  color: #fff;
+  color-scheme: dark;
+}
+.call-room :focus-visible {
+  outline: 2px solid var(--violet-300);
+  outline-offset: 2px;
+}
+.call-btn {
+  background: var(--room-raised);
+  color: #fff;
+}
+.call-btn-danger {
+  background: var(--room-danger);
+  color: #fff;
+}
+@media (hover: hover) and (pointer: fine) {
+  .call-btn:hover:not(:disabled) {
+    background: var(--room-raised-hover);
+  }
+  .call-btn-danger:hover:not(:disabled) {
+    background: var(--room-danger-hover);
+  }
+}
+.call-speaking-ring {
+  box-shadow:
+    inset 0 0 0 3px var(--room-ring),
+    inset 0 0 24px -6px color-mix(in srgb, var(--room-ring) 70%, transparent);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.call-speaking-ring[data-on='true'] {
+  opacity: 1;
 }
 } /* end components */

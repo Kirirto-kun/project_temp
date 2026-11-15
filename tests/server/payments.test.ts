@@ -25,7 +25,30 @@ describe('webhook verification', () => {
   });
 });
 
+describe('webhook secret formats', () => {
+  it('accepts both key derivations for a whsec_ secret', () => {
+    const now = new Date();
+    const ts = String(Math.floor(now.getTime() / 1000));
+    const secret = `whsec_${Buffer.from('holdline-test-key').toString('base64')}`;
+    const wholeSecret = signWebhookForTest('{}', 'evt_w', ts, secret);
+    const decoded = signWebhookForTest('{}', 'evt_w', ts, 'holdline-test-key');
+    expect(verifyWebhook('{}', { id: 'evt_w', timestamp: ts, signature: wholeSecret }, secret, now)).toBe(true);
+    expect(verifyWebhook('{}', { id: 'evt_w', timestamp: ts, signature: decoded }, secret, now)).toBe(true);
+    expect(verifyWebhook('{}', { id: 'evt_w', timestamp: ts, signature: signWebhookForTest('{}', 'evt_w', ts, 'another-key') }, secret, now)).toBe(false);
+  });
+});
+
 describe('entitlements', () => {
+  it('accepts a paid order for any configured plan product and ignores other products', async () => {
+    const deps = makeDeps();
+    const plans = ['prod_trial', 'prod_monthly', 'prod_annual'];
+    const stranger = event(deps, 'evt_p0', paid('ord_p0', OWNER, 'prod_other'));
+    expect(await handlePolarWebhook(deps, stranger.raw, stranger.headers, SECRET, plans)).toBe('ignored');
+    expect((await getEntitlement(deps, OWNER)).status).toBe('none');
+    const annual = event(deps, 'evt_p1', paid('ord_p1', OWNER, 'prod_annual'));
+    expect(await handlePolarWebhook(deps, annual.raw, annual.headers, SECRET, plans)).toBe('ok');
+    expect((await getEntitlement(deps, OWNER)).status).toBe('active');
+  });
   it('checkout leaves access pending; a paid event grants one pack once', async () => {
     const deps = makeDeps();
     await createCheckout(deps, OWNER, IP, PRODUCT);

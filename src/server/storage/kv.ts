@@ -168,7 +168,7 @@ export async function updateJson<T>(
   kv: KeyValueStore,
   key: string,
   mutate: (current: T | null) => T | null | Promise<T | null>,
-  options: { ttlSeconds?: number; retries?: number } = {},
+  options: { ttlSeconds?: number | ((next: T) => number); retries?: number } = {},
 ): Promise<{ value: T | null; written: boolean }> {
   const retries = options.retries ?? 5;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
@@ -176,7 +176,9 @@ export async function updateJson<T>(
     const current = raw === null ? null : (JSON.parse(raw) as T);
     const next = await mutate(current);
     if (next === null) return { value: current, written: false };
-    if (await kv.compareAndSet(key, raw, JSON.stringify(next), options.ttlSeconds)) return { value: next, written: true };
+    // A TTL function is evaluated after `mutate`, so it sees the stored aggregate, not a default.
+    const ttl = typeof options.ttlSeconds === 'function' ? options.ttlSeconds(next) : options.ttlSeconds;
+    if (await kv.compareAndSet(key, raw, JSON.stringify(next), ttl)) return { value: next, written: true };
   }
   throw new Error(`Concurrent update conflict on ${key.split(':')[0]}`);
 }
