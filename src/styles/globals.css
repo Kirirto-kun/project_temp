@@ -504,6 +504,90 @@ input[type='radio'] {
   accent-color: var(--hold);
 }
 
+/* Big money input: currency and period live inside one field. */
+.money-field {
+  display: flex;
+  align-items: center;
+  border-radius: 18px;
+  background: var(--raised);
+  box-shadow:
+    inset 0 0 0 1px var(--line-strong),
+    var(--shadow-xs);
+  transition: box-shadow var(--dur-fast) ease;
+  cursor: text;
+}
+.money-field:focus-within {
+  box-shadow:
+    inset 0 0 0 1.5px var(--hold),
+    0 0 0 4px color-mix(in srgb, var(--hold) 16%, transparent);
+}
+.money-field[data-invalid] {
+  box-shadow:
+    inset 0 0 0 1.5px var(--gap),
+    0 0 0 4px color-mix(in srgb, var(--gap) 12%, transparent);
+}
+
+/* Chat composer: one pill with the send button inside. */
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 6px 6px 6px 18px;
+  border-radius: 26px;
+  background: var(--raised);
+  box-shadow:
+    inset 0 0 0 1px var(--line-strong),
+    var(--shadow-raise);
+  transition: box-shadow var(--dur-fast) ease;
+}
+.composer:focus-within {
+  box-shadow:
+    inset 0 0 0 1.5px var(--hold),
+    0 0 0 4px color-mix(in srgb, var(--hold) 14%, transparent),
+    var(--shadow-raise);
+}
+.composer[data-disabled] {
+  opacity: 0.7;
+}
+.composer-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  max-height: 168px;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 400 16px/24px var(--font-sans);
+  resize: none;
+  outline: none;
+  field-sizing: content;
+}
+.composer-input::placeholder {
+  color: color-mix(in srgb, var(--muted) 80%, transparent);
+}
+.composer-send {
+  min-height: 44px;
+  width: 44px;
+  flex-shrink: 0;
+}
+
+/* Funnel actions: pinned to the bottom of the screen on phones, in flow on larger screens. */
+.funnel-actions {
+  display: grid;
+  gap: 8px;
+}
+@media (max-width: 560px) {
+  .funnel-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin-inline: -16px;
+    padding: 16px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(to top, var(--paper) 72%, color-mix(in srgb, var(--paper) 0%, transparent));
+  }
+}
+
 /* ---------------------------------------------------------------- Option cards */
 
 .option {
@@ -835,6 +919,33 @@ input[type='radio'] {
   animation-play-state: paused;
 }
 
+/* New chat lines grow from their bubble's tail. */
+.msg-in {
+  animation: hl-pop 260ms var(--ease-out) both;
+  transform-origin: bottom left;
+}
+.msg-in-you {
+  transform-origin: bottom right;
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg-in {
+    animation-name: hl-fade;
+  }
+}
+
+/* A value that just arrived gets a brief violet wash, then settles. */
+.value-flash {
+  animation: hl-flash 1.2s ease both;
+}
+@keyframes hl-flash {
+  from {
+    background-color: var(--hold-tint-strong);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
 /* Speaking ring: a soft ping around whoever is talking. */
 .speaking-ring {
   position: relative;
@@ -883,6 +994,12 @@ input[type='radio'] {
   .coach-orb[data-speaking='true'] .coach-bars i {
     animation: hl-voice 900ms var(--ease-in-out) infinite alternate;
     animation-delay: calc(var(--i) * -170ms);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .coach-orb[data-idle='true'] .coach-bars i {
+    animation: hl-voice 1.8s var(--ease-in-out) infinite alternate;
+    animation-delay: calc(var(--i) * -360ms);
   }
 }
 @keyframes hl-voice {
@@ -1018,6 +1135,17 @@ input[type='radio'] {
   }
   .counterpart-card > div:hover {
     box-shadow: var(--shadow-lift);
+  }
+}
+
+.call-end {
+  background: var(--gap);
+  color: #fff;
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--gap) 80%, transparent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .call-end:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--gap) 88%, black);
   }
 }
 

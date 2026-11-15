@@ -50,12 +50,13 @@ export function Avatar({ avatarId, size = 64, speaking = false, label, className
   );
 }
 
-/** Alex, the AI coach: a violet voice orb. The bars move only while Alex is speaking. */
-export function CoachMark({ size = 56, speaking = false, className }: { size?: number; speaking?: boolean; className?: string }) {
+/** Alex, the AI coach: a violet voice orb. The bars move while Alex speaks; `idle` lets them breathe slowly. */
+export function CoachMark({ size = 56, speaking = false, idle = false, className }: { size?: number; speaking?: boolean; idle?: boolean; className?: string }) {
   return (
     <span
       className={cn('coach-orb relative inline-grid shrink-0 place-items-center rounded-full', speaking && 'speaking-ring', className)}
       data-speaking={speaking}
+      data-idle={idle && !speaking}
       style={{ width: size, height: size }}
       role="img"
       aria-label="Alex, AI practice coach"

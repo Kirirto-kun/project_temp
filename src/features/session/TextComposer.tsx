@@ -1,10 +1,11 @@
 'use client';
 
-import { Send } from 'lucide-react';
+import { ArrowUp, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { LIMITS } from '@/contracts/domain';
 
-export function TextComposer({ disabled, onSend, initialText = '' }: { disabled: boolean; onSend: (text: string) => Promise<boolean>; initialText?: string }) {
+/** Chat composer: the field grows with the text; Enter sends, Shift+Enter adds a line. */
+export function TextComposer({ disabled, onSend, initialText = '', placeholder = 'Say what you would say. Lead with the number.' }: { disabled: boolean; onSend: (text: string) => Promise<boolean>; initialText?: string; placeholder?: string }) {
   const [text, setText] = useState(initialText);
   const [busy, setBusy] = useState(false);
   async function submit() {
@@ -15,9 +16,11 @@ export function TextComposer({ disabled, onSend, initialText = '' }: { disabled:
     setBusy(false);
     if (sent) setText('');
   }
+  const canSend = !disabled && !busy && text.trim().length > 0;
   return (
     <form
-      className="flex items-end gap-2"
+      className="composer"
+      data-disabled={disabled || undefined}
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
@@ -28,23 +31,23 @@ export function TextComposer({ disabled, onSend, initialText = '' }: { disabled:
       </label>
       <textarea
         id="reply"
-        className="input min-h-[52px] flex-1 resize-y"
-        rows={2}
+        className="composer-input"
+        rows={1}
         maxLength={LIMITS.replyMaxChars}
-        placeholder="Say what you would say. Lead with the number."
+        placeholder={placeholder}
         value={text}
         disabled={disabled}
+        enterKeyHint="send"
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
+          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             void submit();
           }
         }}
       />
-      <button type="submit" className="btn btn-primary min-h-[52px]" disabled={disabled || busy || !text.trim()} aria-label="Send reply">
-        <Send size={20} strokeWidth={1.5} aria-hidden />
-        <span className="hidden sm:inline">Send</span>
+      <button type="submit" className="btn btn-primary btn-icon composer-send" disabled={!canSend} aria-label="Send reply">
+        {busy ? <Loader2 size={18} className="animate-spin" aria-hidden /> : <ArrowUp size={19} strokeWidth={2.25} aria-hidden />}
       </button>
     </form>
   );

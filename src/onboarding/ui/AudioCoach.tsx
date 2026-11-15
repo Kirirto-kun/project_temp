@@ -152,48 +152,74 @@ export function AudioCoach({ view, onView, onFallback }: { view: IntakeView; onV
     }
   }
 
+  const status =
+    state === 'lobby'
+      ? 'Ready when you are.'
+      : state === 'requesting'
+        ? 'Waiting for the microphone…'
+        : state === 'connecting'
+          ? 'Connecting to Alex…'
+          : state === 'active'
+            ? speaking
+              ? 'Alex is speaking'
+              : 'Listening'
+            : 'Call ended';
+
   return (
-    <div className="grid gap-6 min-[900px]:grid-cols-[minmax(0,1fr)_280px]">
-      <div className="grid gap-4">
-        <div className="card flex flex-wrap items-center gap-4 p-4">
-          <CoachMark size={72} speaking={speaking} />
-          <div className="mr-auto">
-            <div className="text-[16px] font-semibold">Alex</div>
-            <div className="label">AI practice coach</div>
-            <div className="mt-1 text-[14px] text-muted" role="status">
-              {state === 'lobby' && 'Ready when you are.'}
-              {state === 'requesting' && 'Waiting for the microphone…'}
-              {state === 'connecting' && 'Connecting to Alex…'}
-              {state === 'active' && (speaking ? 'Alex is speaking' : 'Listening')}
-              {state === 'ended' && 'Call ended'}
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+      <div className="grid gap-5">
+        <section className="on-violet relative grid justify-items-center gap-4 overflow-hidden rounded-[32px] px-6 pb-7 pt-9 text-center" aria-label="Call with Alex">
+          <div className="pointer-events-none absolute inset-x-0 -top-24 mx-auto h-64 w-64 rounded-full bg-violet-400/40 blur-3xl" aria-hidden />
+          <CoachMark size={112} speaking={speaking} idle={state === 'lobby' || state === 'active'} className="relative" />
+          <div className="relative grid gap-1">
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-[19px] font-semibold tracking-[-0.02em]">Alex</span>
+              <span className="badge bg-white/15 text-white">AI coach</span>
+            </div>
+            <div className="text-[14px] text-white/80" role="status">
+              {status}
             </div>
           </div>
-          {view.deadlineAt && state === 'active' && <span className="mono text-[14px]">{left === null ? '' : formatClock(left)}</span>}
-        </div>
+          {view.deadlineAt && state === 'active' && <span className="mono relative rounded-full bg-white/15 px-3 py-1 text-[13px]">{left === null ? '' : formatClock(left)}</span>}
+          {state === 'lobby' || state === 'requesting' ? (
+            <div className="relative mt-2 grid w-full max-w-[360px] gap-2">
+              <button type="button" className="btn btn-white btn-xl !max-w-none" onClick={() => void start()} disabled={state === 'requesting'}>
+                <Mic size={18} strokeWidth={2} aria-hidden /> Start the call
+              </button>
+              <button type="button" className="btn hero-ghost" onClick={() => onFallback('Typing instead.')}>
+                Type instead
+              </button>
+            </div>
+          ) : (
+            <div className="relative mt-2 flex items-start justify-center gap-6">
+              <div className="grid justify-items-center gap-1.5">
+                <button
+                  type="button"
+                  className={`btn btn-icon !min-h-14 !w-14 ${muted ? 'btn-white' : 'hero-ghost'}`}
+                  onClick={() => setMuted((m) => !m)}
+                  aria-pressed={muted}
+                  disabled={state !== 'active'}
+                  aria-label={muted ? 'Unmute' : 'Mute'}
+                >
+                  {muted ? <MicOff size={22} strokeWidth={1.75} aria-hidden /> : <Mic size={22} strokeWidth={1.75} aria-hidden />}
+                </button>
+                <span className="text-[12px] text-white/75">{muted ? 'Unmute' : 'Mute'}</span>
+              </div>
+              <div className="grid justify-items-center gap-1.5">
+                <button type="button" className="btn btn-icon call-end !min-h-14 !w-14" onClick={() => void end('end')} disabled={state === 'ended'} aria-label="End and review">
+                  <PhoneOff size={22} strokeWidth={1.75} aria-hidden />
+                </button>
+                <span className="text-[12px] text-white/75">End and review</span>
+              </div>
+            </div>
+          )}
+        </section>
         <audio ref={audioRef} autoPlay className="hidden" />
-        {state === 'lobby' || state === 'requesting' ? (
-          <div className="grid gap-3">
-            <p className="m-0 text-[14px] leading-5 text-muted">Use headphones if you can. Your microphone goes to the speech provider so Alex can answer. You can mute, skip or end at any time.</p>
-            <button type="button" className="btn btn-primary btn-xl" onClick={() => void start()} disabled={state === 'requesting'}>
-              Start the call
-            </button>
-            <button type="button" className="btn btn-ghost" onClick={() => onFallback('Typing instead.')}>
-              Type instead
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn btn-secondary" onClick={() => setMuted((m) => !m)} aria-pressed={muted} disabled={state !== 'active'}>
-              {muted ? <MicOff size={20} strokeWidth={1.5} aria-hidden /> : <Mic size={20} strokeWidth={1.5} aria-hidden />}
-              {muted ? 'Unmute' : 'Mute'}
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => void end('end')} disabled={state === 'ended'}>
-              <PhoneOff size={20} strokeWidth={1.5} aria-hidden /> End and review
-            </button>
-          </div>
+        {(state === 'lobby' || state === 'requesting') && (
+          <p className="m-0 text-center text-[14px] leading-6 text-muted">Use headphones if you can. Your microphone goes to the speech provider so Alex can answer. You can mute, skip or end at any time.</p>
         )}
         {error && (
-          <p className="m-0 text-gap" role="alert">
+          <p className="callout callout-warn m-0 text-ink" role="alert">
             {error}
           </p>
         )}
