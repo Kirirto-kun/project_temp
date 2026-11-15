@@ -35,17 +35,16 @@ export class IntakeStore {
 
   /** Read-modify-write; `mutate` returns null to leave the stored state unchanged. Revision is bumped here. */
   async update(id: string, mutate: (current: IntakeSession) => IntakeSession | null): Promise<{ session: IntakeSession; written: boolean }> {
-    let seconds = 60;
     const result = await updateJson<IntakeSession>(
       this.kv,
       key(id),
       (current) => {
         if (!current) return null;
-        seconds = ttl(current, this.now());
         const next = mutate(current);
         return next ? { ...next, revision: current.revision + 1 } : null;
       },
-      { ttlSeconds: seconds },
+      // Computed per write from createdAt; passing a number captured before `mutate` ran made every update expire in 60s.
+      { ttlSeconds: (next) => ttl(next, this.now()) },
     );
     if (!result.value) throw new ApiError('EXPIRED', 'This coach session has expired.');
     return { session: result.value, written: result.written };

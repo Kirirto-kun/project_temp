@@ -23,7 +23,8 @@ import {
   type TranscriptItem,
 } from '../contracts';
 import { buildFeedback, FORBIDDEN_FEEDBACK, speechObservations, textObservations, type SpokenWord } from '../domain/assessment-rules';
-import { extractFromUtterance, type AskedField, type Extraction } from '../domain/extract';
+import { extractFromUtterance, type AskedField, type ExtractContext, type Extraction } from '../domain/extract';
+import { extractionFromModel, MODEL_EXTRACTION_JSON_SCHEMA, MODEL_EXTRACTION_SYSTEM, modelExtractionInput, ModelExtractionSchema, type ModelExtraction } from '../domain/model-extract';
 import { buildDraftFromProfile, handoffFrom } from '../domain/handoff';
 import { coachReply, GREETING, nextField, questionFor } from '../domain/interviewer';
 import { applyCandidate, confirmFields, emptyProfile, markSkipped, markUnknown } from '../domain/profile';
@@ -110,6 +111,21 @@ export async function getIntake(deps: PlatformDeps, ownerId: string, id: string)
   return view(deps, await intakeStore(deps).readOwned(id, ownerId));
 }
 
+/** Model reading of one answer; null on any failure so the deterministic extractor runs. */
+async function readWithModel(deps: PlatformDeps, text: string, ctx: ExtractContext): Promise<ModelExtraction | null> {
+  if (!deps.models.available) return null;
+  const result = await callStructured(deps.models, {
+    purpose: 'intake_extract',
+    system: MODEL_EXTRACTION_SYSTEM,
+    input: modelExtractionInput(text, ctx),
+    jsonSchema: MODEL_EXTRACTION_JSON_SCHEMA,
+    schema: ModelExtractionSchema,
+    retries: 0,
+    timeoutMs: 8_000,
+  });
+  return result.ok ? result.value : null;
+}
+
 /** One text-coach exchange. Idempotent by turnId. */
 export async function postMessage(deps: PlatformDeps, ownerId: string, ipHash: string, id: string, input: { turnId: string; text: string; practice?: boolean }): Promise<IntakeView> {
   const store = intakeStore(deps);
@@ -117,6 +133,9 @@ export async function postMessage(deps: PlatformDeps, ownerId: string, ipHash: s
   if (current.transcript.some((t) => t.turnId === input.turnId)) return view(deps, current);
   if (current.phase === 'completed' || current.phase === 'expired') throw new ApiError('INVALID_INPUT', 'This coach session is finished. Review your brief.');
   await deps.quota.consume('intake_message', ipHash, ownerId);
+  const interviewing = !(current.phase === 'mini_practice' || input.practice);
+  const ctxOf = (s: IntakeSession): ExtractContext => ({ asked: s.askedField as AskedField, profile: s.profile, pending: s.pending, lastMoneyField: lastMoneyField(s) });
+  const reading = interviewing ? await readWithModel(deps, input.text, ctxOf(current)) : null;
   const { session } = await store.update(id, (s) => {
     if (s.transcript.some((t) => t.turnId === input.turnId)) return null;
     const seq = s.transcript.length + 1;
@@ -125,9 +144,12 @@ export async function postMessage(deps: PlatformDeps, ownerId: string, ipHash: s
       const next: IntakeSession = { ...s, transcript: [...s.transcript, userItem, item('coach', 'Thank you. Here is what I heard. Please check the numbers before we continue.', seq + 1)], practiceTurnId: input.turnId, phase: 'review' };
       return { ...next, assessment: assessText(next, input.text) };
     }
-    const extraction = extractFromUtterance(input.text, { asked: s.askedField as AskedField, profile: s.profile, pending: s.pending, lastMoneyField: lastMoneyField(s) });
+    // The model reading is used only against the exact state it was made for; otherwise, or when
+    // it is missing or ungrounded, the deterministic extractor decides.
+    const fromModel = reading && s.revision === current.revision ? extractionFromModel(reading, input.text, ctxOf(s)) : null;
+    const extraction: Extraction = fromModel ?? extractFromUtterance(input.text, ctxOf(s));
     const applied = applyExtraction({ ...s, transcript: [...s.transcript, userItem] }, extraction, input.turnId);
-    const reply = coachReply(applied.profile, extraction, seq);
+    const reply = coachReply(applied.profile, extraction, seq, fromModel?.ack ?? null);
     const phase = extraction.wantsEnd ? 'review' : reply.asked === 'mini_practice' && !extraction.clarification ? 'mini_practice' : 'interviewing';
     return { ...applied, transcript: [...applied.transcript, item('coach', reply.text, seq + 1)], askedField: reply.asked, phase };
   });

@@ -53,8 +53,8 @@ function money(m: MoneyAnswer | null): string {
  * Builds the coach's next line: a short acknowledgement (never a repeated "Great!"), a
  * clarification when units were inferred, otherwise the next unanswered question.
  */
-export function coachReply(profile: IntakeProfile, extraction: Extraction, turn: number): { text: string; asked: Exclude<AskedField, null> } {
-  const ack = ACKS[turn % ACKS.length]!;
+export function coachReply(profile: IntakeProfile, extraction: Extraction, turn: number, modelAck: string | null = null): { text: string; asked: Exclude<AskedField, null> } {
+  const ack = modelAck ?? ACKS[turn % ACKS.length]!;
   const next = nextField(profile);
   if (extraction.wantsEnd) return { text: 'Okay. Let’s stop here and look at what I have so far.', asked: 'mini_practice' };
   if (extraction.clarification) return { text: extraction.clarification.question, asked: extraction.clarification.field === 'marketRange' ? 'marketRange' : extraction.clarification.field };
@@ -67,7 +67,7 @@ export function coachReply(profile: IntakeProfile, extraction: Extraction, turn:
     const noted = [extraction.touched.includes('currentMoney') ? money(profile.currentMoney.value) : null, extraction.touched.includes('targetMoney') ? money(profile.targetMoney.value) : null].filter(Boolean).join(' and ');
     parts.push(`I noted ${noted}. You’ll confirm the numbers at the end.`);
   } else if (extraction.touched.length > 0 || extraction.yes) parts.push(ack);
-  else parts.push('I didn’t catch an answer to that.');
+  else parts.push(modelAck ?? 'I didn’t catch an answer to that.');
   parts.push(questionFor(next, profile));
   return { text: parts.join(' '), asked: next };
 }

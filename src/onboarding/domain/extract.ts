@@ -59,7 +59,7 @@ const HOUR = /\b(per hour|an hour|hourly|\/\s?hr)\b/i;
 const GROSS = /\b(before tax|pre-?tax|gross)\b/i;
 const NET = /\b(after tax|net|take[- ]?home)\b/i;
 
-function salaryKind(kind: IntakeProfile['kind']['value']): boolean {
+export function salaryKind(kind: IntakeProfile['kind']['value']): boolean {
   return kind === null || kind === 'raise' || kind === 'offer';
 }
 
@@ -95,11 +95,11 @@ function interpret(amount: ParsedAmount, text: string, kind: IntakeProfile['kind
   return { answer: { amountMinor: value, currency, period, basis }, needsClarification, needsUnitCheck, start: amount.start };
 }
 
-function describeMoney(m: MoneyAnswer): string {
+export function describeMoney(m: MoneyAnswer): string {
   return m.currency === 'USD' ? formatMoney(m.amountMinor, m.period) : `${(m.amountMinor / 100).toLocaleString('en-US')} ${m.currency}${m.period === 'year' ? ' a year' : m.period === 'month' ? ' a month' : ''}`;
 }
 
-function clarificationQuestion(kind: IntakeProfile['kind']['value'], answers: MoneyAnswer[]): string {
+export function clarificationQuestion(kind: IntakeProfile['kind']['value'], answers: MoneyAnswer[]): string {
   const list = answers.map(describeMoney).join(' and ');
   if (salaryKind(kind)) return `Just to check: ${list}, in US dollars, before tax?`;
   return `Just to check: ${list}?`;
@@ -269,6 +269,17 @@ export function extractFromUtterance(raw: string, ctx: ExtractContext): Extracti
   if (iso) {
     out.patches.push({ patch: { field: 'conversationDate', value: iso[1]! } });
     out.touched.push('conversationDate');
+  }
+  return keepPendingIfUnanswered(out, ctx);
+}
+
+/**
+ * A pending "Just to check…" that got neither yes/no nor a usable answer is asked again,
+ * instead of being dropped while the coach moves on with an unconfirmed amount.
+ */
+export function keepPendingIfUnanswered(out: Extraction, ctx: ExtractContext): Extraction {
+  if (ctx.pending && !out.clarification && out.patches.length === 0 && !out.yes && !out.no && !out.skipped && !out.wantsEnd && !out.dontKnow) {
+    return { ...out, clarification: ctx.pending };
   }
   return out;
 }
