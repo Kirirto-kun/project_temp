@@ -21,7 +21,13 @@ export interface PendingLine {
 export function Transcript({ messages, pending, counterpartLabel, typing, avatarId }: { messages: SessionMessage[]; pending: PendingLine[]; counterpartLabel: string; typing: boolean; avatarId: string }) {
   const [initial] = useState(() => new Set(messages.map((m) => m.id)));
   const endRef = useRef<HTMLDivElement | null>(null);
+  const mounted = useRef(false);
   useEffect(() => {
+    // Follow new lines only; on load the scoreboard above the chat stays in view.
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
     endRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [messages.length, pending.length, typing]);
 
