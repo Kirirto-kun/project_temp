@@ -2,8 +2,10 @@ import { expect, test } from '@playwright/test';
 
 test('paid APIs are protected on the server and the free path never needs them', async ({ page, request }) => {
   await page.goto('/pricing');
-  await expect(page.getByText('Practice is free.')).toBeVisible();
-  await expect(page.getByText(/One-time payment\. No subscription/)).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('One free round. Then a plan.');
+  const plans = page.getByRole('list', { name: 'Plans' });
+  for (const price of ['$4.99', '$29.99', '$119.99']) await expect(plans).toContainText(price);
+  await expect(plans).toContainText('30-day money-back guarantee');
   // A browser flag cannot grant access: the server decides.
   await page.evaluate(() => localStorage.setItem('paid', 'true'));
   const custom = await request.post('/api/scenarios/custom', { data: {}, headers: { 'Idempotency-Key': 'e2e-custom-0001' } });
