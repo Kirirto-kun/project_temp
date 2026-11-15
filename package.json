@@ -7,8 +7,7 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "avatar:register-secret": "tsx --env-file-if-exists=.env.local scripts/avatar-register-secret.ts",
-    "avatar:sync-agent": "tsx --env-file-if-exists=.env.local scripts/avatar-sync-agent.ts",
+    "avatar:setup-voice": "tsx scripts/avatar-setup-voice.ts",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

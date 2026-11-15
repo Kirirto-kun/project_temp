@@ -2,9 +2,11 @@ import { ApiClientError } from '@/client/api/client';
 import type { IntakeView } from '../contracts';
 
 export interface AvatarSessionCallbacks {
-  caption(role: 'user' | 'coach', text: string, itemId: string): void;
-  tool(callId: string, name: string, args: string): void;
+  /** A final transcript of what the user said (LiveAvatar's speech recognition). */
+  userSaid(text: string, itemId: string): void;
+  userSpeaking(): void;
   speaking(on: boolean): void;
+  streamReady(): void;
   disconnected(): void;
 }
 
@@ -12,19 +14,19 @@ export interface AvatarSession {
   start(): Promise<void>;
   attach(element: HTMLVideoElement): void;
   setMuted(muted: boolean): Promise<void>;
-  sendToolResult(callId: string, result: string): void;
+  speak(text: string): void;
+  interrupt(): void;
   stop(): Promise<void>;
 }
 
 export type AvatarSessionFactory = (token: string, callbacks: AvatarSessionCallbacks) => Promise<AvatarSession>;
 
-export type AvatarStopReason = 'end' | 'timeout' | 'error' | 'fallback';
+export type AvatarStopReason = 'end' | 'review' | 'timeout' | 'error' | 'fallback';
 export type AvatarCallState = 'idle' | 'connecting' | 'active' | 'ending' | 'ended';
 
 export interface AvatarCallApi {
   connect(): Promise<{ intake: IntakeView; sessionToken: string; providerEpoch: number }>;
-  transcript(providerEpoch: number, itemId: string, role: 'user' | 'coach', text: string): Promise<IntakeView>;
-  tool(providerEpoch: number, callId: string, name: string, args: string): Promise<{ output: Record<string, unknown> }>;
+  turn(providerEpoch: number, itemId: string, text: string): Promise<{ intake: IntakeView; reply: string | null }>;
   stop(reason: AvatarStopReason): Promise<IntakeView>;
 }
 
@@ -32,17 +34,27 @@ export interface AvatarCallEvents {
   state(state: AvatarCallState): void;
   view(view: IntakeView): void;
   speaking(on: boolean): void;
+  live(on: boolean): void;
   /** The call could not start or dropped; the screen continues with the next coach. */
   failed(message: string): void;
 }
 
-export const CONNECT_TIMEOUT_MS = 15_000;
-export const GOODBYE_MS = 2_500;
+export const CONNECT_TIMEOUT_MS = 20_000;
+/** After the last line, give Alex time to finish speaking before the review opens. */
+export function goodbyeMs(text: string): number {
+  return Math.min(12_000, Math.max(2_500, text.length * 65));
+}
+
+/** The last thing Alex said in a view (the greeting on a fresh call, or the last question on a reconnect). */
+export function lastCoachLine(view: IntakeView): string | null {
+  const last = view.committedTranscript.at(-1);
+  return last?.role === 'coach' ? last.text : null;
+}
 
 /**
  * One video call attempt per instance. After `end`, every late SDK event is ignored, so nothing
- * from a closed call reaches the server or the screen. Captions and tool calls share one queue in
- * arrival order: the server accepts a tool's quote only once the user's words are on record.
+ * from a closed call reaches the server or the screen. User turns go through one queue in arrival
+ * order; each returns the coach's next line, which Alex then says.
  */
 export class AvatarCall {
   state: AvatarCallState = 'idle';
@@ -53,6 +65,7 @@ export class AvatarCall {
   private queue: Promise<void> = Promise.resolve();
   private ending: Promise<void> | null = null;
   private stopReason: AvatarStopReason = 'fallback';
+  private goodbye: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly api: AvatarCallApi,
@@ -93,6 +106,8 @@ export class AvatarCall {
         return;
       }
       this.setState('active');
+      const opening = lastCoachLine(credentials.intake);
+      if (opening) session.speak(opening);
     } catch (err) {
       if (!this.closed) await this.fail(err instanceof ApiClientError ? err.message : 'Alex could not connect. Check your microphone; your answers are kept.');
     } finally {
@@ -115,7 +130,9 @@ export class AvatarCall {
     if (this.ending) return this.ending;
     this.closed = true;
     this.stopReason = reason;
+    if (this.goodbye) clearTimeout(this.goodbye);
     this.setState('ending');
+    this.events.live(false);
     const session = this.session;
     this.session = null;
     this.ending = (async () => {
@@ -123,7 +140,7 @@ export class AvatarCall {
       try {
         this.events.view(await this.api.stop(reason));
       } catch {
-        // The screen re-reads the intake on fallback or review.
+        // The screen re-reads the intake once the call has ended.
       }
       this.setState('ended');
     })();
@@ -146,40 +163,36 @@ export class AvatarCall {
         if (!this.closed) await task();
       })
       .catch((error: unknown) => {
-        console.warn('avatar call: relay failed', error);
+        console.warn('avatar call: turn failed', error);
       });
   }
 
   private callbacks(): AvatarSessionCallbacks {
     return {
-      caption: (role, text, itemId) => {
+      userSaid: (text, itemId) => {
         const clean = text.trim().slice(0, 4_000);
-        if (!clean || this.closed) return;
+        if (!clean || this.closed || this.goodbye) return;
         this.enqueue(async () => {
-          const next = await this.api.transcript(this.epoch, itemId, role, clean);
-          if (!this.closed) this.events.view(next);
+          const { intake, reply } = await this.api.turn(this.epoch, itemId, clean);
+          if (this.closed) return;
+          this.events.view(intake);
+          if (reply) this.session?.speak(reply);
+          // The coach moved on to review: let Alex finish the line, then open the review.
+          if (intake.phase === 'review' || intake.phase === 'completed') this.goodbye = setTimeout(() => void this.end('review'), goodbyeMs(reply ?? ''));
         });
       },
-      tool: (callId, name, args) => {
-        if (this.closed) return;
-        this.enqueue(async () => {
-          let output: Record<string, unknown>;
-          try {
-            output = (await this.api.tool(this.epoch, callId, name, args)).output;
-          } catch (error) {
-            console.warn('avatar call: tool relay failed', error);
-            output = { ok: false, error: 'The server did not accept this call.' };
-          }
-          if (this.closed) return;
-          this.session?.sendToolResult(callId, JSON.stringify(output));
-          if (name === 'request_end') setTimeout(() => void this.end('end'), GOODBYE_MS);
-        });
+      userSpeaking: () => {
+        // The user talks over Alex: stop the current line so the turn feels natural.
+        if (!this.closed && !this.goodbye) this.session?.interrupt();
       },
       speaking: (on) => {
         if (!this.closed) this.events.speaking(on);
       },
+      streamReady: () => {
+        if (!this.closed) this.events.live(true);
+      },
       disconnected: () => {
-        if (!this.closed) void this.fail('The call dropped. Your answers are kept.');
+        if (!this.closed) void this.fail('The video call dropped. Your answers are kept.');
       },
     };
   }

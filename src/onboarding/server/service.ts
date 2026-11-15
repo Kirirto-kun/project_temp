@@ -5,6 +5,7 @@ import { suggestPracticeRange } from '@/domain/intake-handoff';
 import { formatMoney } from '@/domain/money';
 import { callStructured } from '@/intelligence/structured';
 import { onlyAllowedAmounts } from '@/intelligence/money-guard';
+import { logEvent } from '@/server/observability';
 import { ApiError } from '@/server/http';
 import { newId } from '@/server/ids';
 import { COST_ESTIMATES } from '@/server/limits/budget';
@@ -118,21 +119,23 @@ export async function postMessage(deps: PlatformDeps, ownerId: string, ipHash: s
   if (current.transcript.some((t) => t.turnId === input.turnId)) return view(deps, current);
   if (current.phase === 'completed' || current.phase === 'expired') throw new ApiError('INVALID_INPUT', 'This coach session is finished. Review your brief.');
   await deps.quota.consume('intake_message', ipHash, ownerId);
-  const { session } = await store.update(id, (s) => {
-    if (s.transcript.some((t) => t.turnId === input.turnId)) return null;
-    const seq = s.transcript.length + 1;
-    const userItem = item('user', input.text, seq, input.turnId);
-    if (s.phase === 'mini_practice' || input.practice) {
-      const next: IntakeSession = { ...s, transcript: [...s.transcript, userItem, item('coach', 'Thank you. Here is what I heard. Please check the numbers before we continue.', seq + 1)], practiceTurnId: input.turnId, phase: 'review' };
-      return { ...next, assessment: assessText(next, input.text) };
-    }
-    const extraction = extractFromUtterance(input.text, { asked: s.askedField as AskedField, profile: s.profile, pending: s.pending, lastMoneyField: lastMoneyField(s) });
-    const applied = applyExtraction({ ...s, transcript: [...s.transcript, userItem] }, extraction, input.turnId);
-    const reply = coachReply(applied.profile, extraction, seq);
-    const phase = extraction.wantsEnd ? 'review' : reply.asked === 'mini_practice' && !extraction.clarification ? 'mini_practice' : 'interviewing';
-    return { ...applied, transcript: [...applied.transcript, item('coach', reply.text, seq + 1)], askedField: reply.asked, phase };
-  });
+  const { session } = await store.update(id, (s) => (s.transcript.some((t) => t.turnId === input.turnId) ? null : coachTurn(s, input.text, input.turnId, Boolean(input.practice))));
   return view(deps, session);
+}
+
+/** One answer through the deterministic coach: extraction, profile update and Alex's next line. */
+function coachTurn(s: IntakeSession, text: string, turnId: string, practice: boolean): IntakeSession {
+  const seq = s.transcript.length + 1;
+  const userItem = item('user', text, seq, turnId);
+  if (s.phase === 'mini_practice' || practice) {
+    const next: IntakeSession = { ...s, transcript: [...s.transcript, userItem, item('coach', 'Thank you. Here is what I heard. Please check the numbers before we continue.', seq + 1)], practiceTurnId: turnId, phase: 'review' };
+    return { ...next, assessment: assessText(next, text) };
+  }
+  const extraction = extractFromUtterance(text, { asked: s.askedField as AskedField, profile: s.profile, pending: s.pending, lastMoneyField: lastMoneyField(s) });
+  const applied = applyExtraction({ ...s, transcript: [...s.transcript, userItem] }, extraction, turnId);
+  const reply = coachReply(applied.profile, extraction, seq);
+  const phase = extraction.wantsEnd ? 'review' : reply.asked === 'mini_practice' && !extraction.clarification ? 'mini_practice' : 'interviewing';
+  return { ...applied, transcript: [...applied.transcript, item('coach', reply.text, seq + 1)], askedField: reply.asked, phase };
 }
 
 /** Skips the mini-practice and goes straight to review. */
@@ -444,6 +447,8 @@ function openAttempt(s: IntakeSession, mode: 'audio' | 'video', attempt: MediaAt
     deadlineAt: attempt.resuming ? s.deadlineAt : new Date(attempt.now.getTime() + MEDIA_LIMIT_MS).toISOString(),
     budgetReservation: attempt.reservation,
     providerSessionId,
+    // The video coach speaks what the server writes, so the first connect starts with the greeting.
+    transcript: mode === 'video' && s.transcript.length === 0 ? [item('coach', GREETING, 1)] : s.transcript,
   };
 }
 
@@ -481,7 +486,9 @@ export async function connectVideo(deps: PlatformDeps, ownerId: string, ipHash: 
   try {
     // Five seconds short of the deadline, so the local countdown ends the call before LiveAvatar cuts it off.
     token = await liveAvatar.mintToken({ maxSeconds: (deadlineMs - attempt.now.getTime()) / 1_000 - 5 });
-  } catch {
+  } catch (error) {
+    // Status only: provider bodies are never logged.
+    logEvent('warn', 'liveavatar.token_failed', { reason: error instanceof Error ? error.message : 'unknown' });
     await abandonMediaAttempt(deps, ipHash, attempt);
     throw new ApiError('UPSTREAM_UNAVAILABLE', 'The video call could not start. Your answers are kept.', {}, 10);
   }
@@ -494,6 +501,28 @@ export async function connectVideo(deps: PlatformDeps, ownerId: string, ipHash: 
     throw error;
   }
   return { intake: view(deps, session), sessionToken: token.sessionToken, providerEpoch: session.providerEpoch, deadlineAt: session.deadlineAt! };
+}
+
+export const VideoTurnSchema = z.object({ providerEpoch: z.number().int(), itemId: z.string().min(1).max(160), text: z.string().trim().min(1).max(4_000) });
+
+/**
+ * A final user transcript from the video call (LiveAvatar FULL does the speech recognition).
+ * Runs the same deterministic coach as typed answers and returns the line Alex should say.
+ * Events from an older attempt, or after the call closed, change nothing and get no reply.
+ */
+export async function videoTurn(deps: PlatformDeps, ownerId: string, id: string, input: z.infer<typeof VideoTurnSchema>): Promise<{ intake: IntakeView; reply: string | null }> {
+  const store = intakeStore(deps);
+  await store.readOwned(id, ownerId);
+  const turnId = `vt_${input.itemId}`;
+  const { session } = await store.update(id, (s) => {
+    if (s.mode !== 'video' || s.providerEpoch !== input.providerEpoch || s.mediaStatus === 'closed' || s.mediaStatus === 'stopping') return null;
+    if (s.phase !== 'interviewing' && s.phase !== 'mini_practice') return null;
+    if (s.transcript.some((t) => t.turnId === turnId)) return null;
+    return { ...coachTurn(s, input.text, turnId, false), mediaStatus: 'active' };
+  });
+  const index = session.transcript.findIndex((t) => t.turnId === turnId);
+  const next = index >= 0 ? session.transcript[index + 1] : undefined;
+  return { intake: view(deps, session), reply: next?.role === 'coach' ? next.text : null };
 }
 
 export const TranscriptEventSchema = z.object({ providerEpoch: z.number().int(), itemId: z.string().min(1).max(120), role: z.enum(['user', 'coach']), text: z.string().trim().min(1).max(4_000) });

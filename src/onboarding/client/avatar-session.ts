@@ -1,35 +1,25 @@
-// src/onboarding/client/avatar-session.ts
 import type { AvatarSessionFactory } from './avatar-call';
 
-/** ElevenLabs client_tool_call payloads arrive either wrapped in `client_tool_call` or flat. */
-export function toolCall(type: string, data: Record<string, unknown> | undefined): { id: string; name: string; args: string } | null {
-  if (type !== 'client_tool_call') return null;
-  const raw = (data?.client_tool_call ?? data ?? {}) as Record<string, unknown>;
-  if (typeof raw.tool_call_id !== 'string' || typeof raw.tool_name !== 'string') return null;
-  return { id: raw.tool_call_id, name: raw.tool_name, args: JSON.stringify(raw.parameters ?? {}) };
-}
-
 /**
- * Thin wrapper over the LiveAvatar SDK's ElevenLabs agent session, loaded only when a video call
- * starts. The microphone starts muted; the caller unmutes once the attempt is confirmed current.
+ * Thin wrapper over the LiveAvatar SDK in FULL mode, loaded only when a video call starts.
+ * LiveAvatar hears the user and lip-syncs; every line Alex says comes from our server via
+ * `repeat`. The microphone starts muted; the caller unmutes once the attempt is current.
  */
 export const createAvatarSession: AvatarSessionFactory = async (token, callbacks) => {
-  const { ElevenLabsAgentSession, AgentEventsEnum, SessionEvent, SessionDisconnectReason, VoiceChatState } = await import('@heygen/liveavatar-web-sdk');
-  const session = new ElevenLabsAgentSession(token, { autoKeepAlive: true, voiceChat: { defaultMuted: true } });
+  const { LiveAvatarSession, AgentEventsEnum, SessionEvent, SessionDisconnectReason, VoiceChatState } = await import('@heygen/liveavatar-web-sdk');
+  const session = new LiveAvatarSession(token, { autoKeepAlive: true, voiceChat: { defaultMuted: true } });
   let media: HTMLVideoElement | null = null;
   let closing = false;
-  session.on(AgentEventsEnum.USER_TRANSCRIPTION, (e) => callbacks.caption('user', e.text, e.event_id));
-  session.on(AgentEventsEnum.AVATAR_TRANSCRIPTION, (e) => callbacks.caption('coach', e.text, e.event_id));
+  session.on(AgentEventsEnum.USER_TRANSCRIPTION, (e) => callbacks.userSaid(e.text, e.event_id));
+  session.on(AgentEventsEnum.USER_SPEAK_STARTED, () => callbacks.userSpeaking());
   session.on(AgentEventsEnum.AVATAR_SPEAK_STARTED, () => callbacks.speaking(true));
   session.on(AgentEventsEnum.AVATAR_SPEAK_ENDED, () => callbacks.speaking(false));
-  session.on(AgentEventsEnum.ELEVENLABS_AGENT_EVENT, (e) => {
-    const call = toolCall(e.elevenlabs_event_type, e.data);
-    if (call) callbacks.tool(call.id, call.name, call.args);
-    else if (process.env.NODE_ENV !== 'production') console.debug('avatar: elevenlabs event', e.elevenlabs_event_type);
-  });
   // attach() is a no-op until the remote tracks exist; attach again once they arrive.
   session.on(SessionEvent.SESSION_STREAM_READY, () => {
-    if (media && !closing) session.attach(media);
+    if (media && !closing) {
+      session.attach(media);
+      callbacks.streamReady();
+    }
   });
   // The SDK also emits this for our own stop() and failed start(); only provider-side drops count.
   session.on(SessionEvent.SESSION_DISCONNECTED, (reason) => {
@@ -52,8 +42,11 @@ export const createAvatarSession: AvatarSessionFactory = async (token, callbacks
       session.attach(element);
     },
     setMuted: (muted) => (muted ? session.voiceChat.mute() : session.voiceChat.unmute()),
-    sendToolResult(callId, result) {
-      session.sendClientToolResult({ toolCallId: callId, result });
+    speak(text) {
+      if (!closing) session.repeat(text);
+    },
+    interrupt() {
+      if (!closing) session.interrupt();
     },
     async stop() {
       closing = true;

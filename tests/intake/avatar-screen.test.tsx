@@ -13,8 +13,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/onboarding/client/api', () => ({
   getIntake: mocks.getIntake,
   connectVideo: vi.fn(),
-  postTranscript: vi.fn(),
-  relayTool: vi.fn(),
+  postVideoTurn: vi.fn(),
   stopIntake: vi.fn(),
 }));
 

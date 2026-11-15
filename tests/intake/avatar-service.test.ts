@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { COST_ESTIMATES } from '@/server/limits/budget';
 import type { LiveAvatarClient } from '@/onboarding/server/liveavatar';
-import { confirmProfile, connectVideo, createIntake, deleteIntake, handleTool, intakeStore, postMessage, stopMedia } from '@/onboarding/server/service';
+import { confirmProfile, connectVideo, createIntake, deleteIntake, handleTool, intakeStore, postMessage, stopMedia, videoTurn } from '@/onboarding/server/service';
 import { ALL_ON, IP, OWNER, makeDeps } from '../server/helpers';
 
 function fakeLiveAvatar(): LiveAvatarClient & { mintToken: ReturnType<typeof vi.fn>; stopSession: ReturnType<typeof vi.fn> } {
@@ -149,5 +149,51 @@ describe('video call', () => {
     await confirmProfile(deps, OWNER, v.id, before!.revision, []);
     expect(liveAvatar.stopSession).toHaveBeenCalledWith('sess-1');
     expect(await deps.budget.spentToday()).toBe(COST_ESTIMATES.avatarPerMinute);
+  });
+
+  it('the first connect starts with Alex greeting; a reconnect does not repeat it', async () => {
+    const { deps, v } = await videoIntake();
+    const first = await connectVideo(deps, OWNER, IP, v.id, v.revision);
+    expect(first.intake.committedTranscript).toEqual([expect.objectContaining({ role: 'coach', text: expect.stringMatching(/^I'm Alex/) })]);
+    deps.clock.now += 10_000;
+    const second = await connectVideo(deps, OWNER, IP, v.id, first.intake.revision);
+    expect(second.intake.committedTranscript).toHaveLength(1);
+  });
+
+  it('a user turn runs the coach and returns the line Alex should say', async () => {
+    const { deps, v } = await videoIntake();
+    const { providerEpoch } = await connectVideo(deps, OWNER, IP, v.id, v.revision);
+    const turn = await videoTurn(deps, OWNER, v.id, { providerEpoch, itemId: 'e1', text: 'I want a raise from my manager' });
+    expect(turn.intake.mediaStatus).toBe('active');
+    expect(turn.intake.committedTranscript.at(-2)).toMatchObject({ role: 'user', text: 'I want a raise from my manager' });
+    expect(turn.reply).toBe(turn.intake.committedTranscript.at(-1)!.text);
+    expect(turn.intake.publicProfile.kind.value).toBe('raise');
+  });
+
+  it('a repeated turn is recorded once and returns the same reply', async () => {
+    const { deps, v } = await videoIntake();
+    const { providerEpoch } = await connectVideo(deps, OWNER, IP, v.id, v.revision);
+    const a = await videoTurn(deps, OWNER, v.id, { providerEpoch, itemId: 'e1', text: 'I want a raise' });
+    const b = await videoTurn(deps, OWNER, v.id, { providerEpoch, itemId: 'e1', text: 'I want a raise' });
+    expect(b.intake.committedTranscript).toHaveLength(a.intake.committedTranscript.length);
+    expect(b.reply).toBe(a.reply);
+  });
+
+  it('turns from an old attempt or after the call closed change nothing and get no reply', async () => {
+    const { deps, v } = await videoIntake();
+    const { providerEpoch } = await connectVideo(deps, OWNER, IP, v.id, v.revision);
+    const stale = await videoTurn(deps, OWNER, v.id, { providerEpoch: providerEpoch - 1, itemId: 'e1', text: 'I want a raise' });
+    expect(stale.reply).toBeNull();
+    expect(stale.intake.committedTranscript).toHaveLength(1);
+    await stopMedia(deps, OWNER, v.id, 'end');
+    const late = await videoTurn(deps, OWNER, v.id, { providerEpoch, itemId: 'e2', text: 'I want a raise' });
+    expect(late.reply).toBeNull();
+    expect(late.intake.committedTranscript).toHaveLength(1);
+  });
+
+  it('another owner cannot post turns', async () => {
+    const { deps, v } = await videoIntake();
+    const { providerEpoch } = await connectVideo(deps, OWNER, IP, v.id, v.revision);
+    await expect(videoTurn(deps, 'own_someoneelse0000000000', v.id, { providerEpoch, itemId: 'e1', text: 'hi' })).rejects.toBeTruthy();
   });
 });

@@ -3,20 +3,19 @@ import { z } from 'zod';
 
 const API = 'https://api.liveavatar.com/v1';
 const TokenResponse = z.object({
-  code: z.literal(1000),
+  code: z.union([z.literal(1000), z.literal(100)]),
   data: z.object({ session_id: z.string().min(1).max(120), session_token: z.string().min(1).max(16_384) }),
 });
 
 export interface LiveAvatarSettings {
   apiKey: string;
   avatarId: string;
-  secretId: string;
-  agentId: string;
+  voiceId: string;
   sandbox: boolean;
 }
 
 export interface LiveAvatarClient {
-  /** LITE session bound to the ElevenLabs coach agent. The API key and agent secret never leave the server. */
+  /** FULL session: LiveAvatar runs speech recognition and lip sync; our server writes every line Alex says. The API key never leaves the server. */
   mintToken(input: { maxSeconds: number }): Promise<{ sessionId: string; sessionToken: string }>;
   /** An unknown or already-ended session (the browser SDK often stops first) counts as stopped. */
   stopSession(sessionId: string): Promise<void>;
@@ -28,19 +27,20 @@ export function createLiveAvatar(settings: LiveAvatarSettings, fetchImpl: typeof
   const headers = { 'X-API-KEY': settings.apiKey, 'Content-Type': 'application/json' };
   return {
     async mintToken({ maxSeconds }) {
-      const seconds = Math.max(1, Math.min(300, Math.floor(maxSeconds)));
+      // The free sandbox rejects sessions longer than a minute.
+      const seconds = Math.max(1, Math.min(settings.sandbox ? 60 : 300, Math.floor(maxSeconds)));
       const response = await fetchImpl(`${API}/sessions/token`, {
         method: 'POST',
         headers,
         cache: 'no-store',
         signal: AbortSignal.timeout(15_000),
         body: JSON.stringify({
-          mode: 'LITE',
+          mode: 'FULL',
           avatar_id: settings.avatarId,
           is_sandbox: settings.sandbox,
           max_session_duration: seconds,
           video_settings: { quality: 'high', encoding: 'H264' },
-          elevenlabs_agent_config: { secret_id: settings.secretId, agent_id: settings.agentId },
+          avatar_persona: { voice_id: settings.voiceId, language: 'en' },
         }),
       });
       if (!response.ok) throw new LiveAvatarError(`LiveAvatar token request failed with ${response.status}`);

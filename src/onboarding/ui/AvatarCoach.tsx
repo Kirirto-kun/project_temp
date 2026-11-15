@@ -1,24 +1,26 @@
 'use client';
 
-import { Mic, MicOff, PhoneOff } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Video } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { CoachMark } from '@/components/holdline/Avatar';
 import { formatClock, useCountdown } from '@/features/session/useCountdown';
 import type { IntakeView } from '../contracts';
-import { connectVideo, getIntake, postTranscript, relayTool, stopIntake } from '../client/api';
+import { connectVideo, getIntake, postVideoTurn, stopIntake } from '../client/api';
 import { AvatarCall, type AvatarCallState } from '../client/avatar-call';
 import { createAvatarSession } from '../client/avatar-session';
 import { Captions } from './TextCoach';
 import { ProfileSoFar } from './ProfileSoFar';
 
 /**
- * Video call with Alex (LiveAvatar + ElevenLabs agent). Only the microphone is used; the camera
- * stays off. Tools and transcripts go through the same server routes as the audio coach.
+ * Video call with Alex (LiveAvatar FULL). Same layout and controls as the voice call: the avatar
+ * video takes the place of the coach mark. Only the microphone is used; the camera stays off.
+ * LiveAvatar hears the user; our deterministic coach writes every line Alex says.
  */
 export function AvatarCoach({ view, onView, onFallback, onTypeInstead }: { view: IntakeView; onView: (v: IntakeView) => void; onFallback: (reason: string) => void; onTypeInstead: () => void }) {
   const [state, setState] = useState<AvatarCallState>('idle');
   const [muted, setMuted] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [live, setLive] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const callRef = useRef<AvatarCall | null>(null);
   const left = useCountdown(view.deadlineAt);
@@ -40,12 +42,11 @@ export function AvatarCoach({ view, onView, onFallback, onTypeInstead }: { view:
     const call = new AvatarCall(
       {
         connect: () => connectVideo(view.id, view.revision),
-        transcript: (epoch, itemId, role, text) => postTranscript(view.id, epoch, itemId, role, text),
-        tool: (epoch, callId, name, args) => relayTool(view.id, epoch, callId, name, args),
+        turn: (epoch, itemId, text) => postVideoTurn(view.id, epoch, itemId, text),
         stop: (reason) => stopIntake(view.id, reason),
       },
       createAvatarSession,
-      { state: setState, view: onView, speaking: setSpeaking, failed: onFallback },
+      { state: setState, view: onView, speaking: setSpeaking, live: setLive, failed: onFallback },
     );
     callRef.current = call;
     if (videoRef.current) call.attach(videoRef.current);
@@ -58,52 +59,60 @@ export function AvatarCoach({ view, onView, onFallback, onTypeInstead }: { view:
     void callRef.current?.mute(next);
   }
 
-  const live = state === 'active';
+  const active = state === 'active';
+  const status =
+    state === 'idle' ? 'Ready when you are.' : state === 'connecting' ? 'Connecting to Alex… this takes a few seconds.' : active ? (speaking ? 'Alex is speaking' : 'Listening') : 'Call ended';
+
   return (
-    <div className="grid gap-6 min-[900px]:grid-cols-[minmax(0,1fr)_280px]">
-      <div className="grid gap-4">
-        <div className="card relative overflow-hidden p-0">
-          <video ref={videoRef} autoPlay playsInline className="block aspect-video w-full bg-raised object-cover" aria-label="Alex, AI practice coach" />
-          {!live && (
-            <div className="absolute inset-0 grid place-items-center bg-raised">
-              <CoachMark size={96} />
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+      <div className="grid gap-5">
+        <section className="on-violet relative grid justify-items-center gap-4 overflow-hidden rounded-[32px] px-6 pb-7 pt-9 text-center" aria-label="Video call with Alex">
+          <div className="pointer-events-none absolute inset-x-0 -top-24 mx-auto h-64 w-64 rounded-full bg-violet-400/40 blur-3xl" aria-hidden />
+          <div className="relative aspect-video w-full max-w-[560px] overflow-hidden rounded-[24px] bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.15)]">
+            <video ref={videoRef} autoPlay playsInline className={`h-full w-full object-cover transition-opacity duration-300 ${live ? 'opacity-100' : 'opacity-0'}`} aria-label="Alex, AI practice coach (AI avatar)" />
+            {!live && (
+              <div className="absolute inset-0 grid place-items-center">
+                <CoachMark size={112} speaking={speaking} idle={state === 'idle'} />
+              </div>
+            )}
+            {view.deadlineAt && active && <span className="mono absolute right-3 top-3 rounded-full bg-black/35 px-3 py-1 text-[13px] text-white">{left === null ? '' : formatClock(left)}</span>}
+          </div>
+          <div className="relative grid gap-1">
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-[19px] font-semibold tracking-[-0.02em]">Alex</span>
+              <span className="badge bg-white/15 text-white">AI coach · AI avatar</span>
+            </div>
+            <div className="text-[14px] text-white/80" role="status">
+              {status}
+            </div>
+          </div>
+          {state === 'idle' ? (
+            <div className="relative mt-2 grid w-full max-w-[360px] gap-2">
+              <button type="button" className="btn btn-white btn-xl !max-w-none" onClick={start}>
+                <Video size={18} strokeWidth={2} aria-hidden /> Start the video call
+              </button>
+              <button type="button" className="btn hero-ghost" onClick={onTypeInstead}>
+                Type instead
+              </button>
+            </div>
+          ) : (
+            <div className="relative mt-2 flex items-start justify-center gap-6">
+              <div className="grid justify-items-center gap-1.5">
+                <button type="button" className={`btn btn-icon !min-h-14 !w-14 ${muted ? 'btn-white' : 'hero-ghost'}`} onClick={toggleMute} aria-pressed={muted} disabled={!active} aria-label={muted ? 'Unmute' : 'Mute'}>
+                  {muted ? <MicOff size={22} strokeWidth={1.75} aria-hidden /> : <Mic size={22} strokeWidth={1.75} aria-hidden />}
+                </button>
+                <span className="text-[12px] text-white/75">{muted ? 'Unmute' : 'Mute'}</span>
+              </div>
+              <div className="grid justify-items-center gap-1.5">
+                <button type="button" className="btn btn-icon call-end !min-h-14 !w-14" onClick={() => void callRef.current?.end('end')} disabled={state === 'ending' || state === 'ended'} aria-label="End and review">
+                  <PhoneOff size={22} strokeWidth={1.75} aria-hidden />
+                </button>
+                <span className="text-[12px] text-white/75">End and review</span>
+              </div>
             </div>
           )}
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="mr-auto">
-            <div className="text-[16px] font-semibold">Alex</div>
-            <div className="label">AI practice coach · AI avatar</div>
-            <div className="mt-1 text-[14px] text-muted" role="status">
-              {state === 'idle' && 'Ready when you are.'}
-              {state === 'connecting' && 'Connecting to Alex…'}
-              {live && (speaking ? 'Alex is speaking' : 'Listening')}
-              {(state === 'ending' || state === 'ended') && 'Call ended'}
-            </div>
-          </div>
-          {view.deadlineAt && live && <span className="mono text-[14px]">{left === null ? '' : formatClock(left)}</span>}
-        </div>
-        {state === 'idle' ? (
-          <div className="grid gap-3">
-            <p className="m-0 text-[14px] leading-5 text-muted">Use headphones if you can. Your microphone goes to our video and speech providers so Alex can answer; your camera stays off. You can mute or end at any time.</p>
-            <button type="button" className="btn btn-primary btn-xl" onClick={start}>
-              Start the video call
-            </button>
-            <button type="button" className="btn btn-ghost" onClick={onTypeInstead}>
-              Type instead
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn btn-secondary" onClick={toggleMute} aria-pressed={muted} disabled={!live}>
-              {muted ? <MicOff size={20} strokeWidth={1.5} aria-hidden /> : <Mic size={20} strokeWidth={1.5} aria-hidden />}
-              {muted ? 'Unmute' : 'Mute'}
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => void callRef.current?.end('end')} disabled={state === 'ending' || state === 'ended'}>
-              <PhoneOff size={20} strokeWidth={1.5} aria-hidden /> End and review
-            </button>
-          </div>
-        )}
+        </section>
+        {state === 'idle' && <p className="m-0 text-center text-[14px] leading-6 text-muted">Use headphones if you can. Your microphone goes to our video provider so Alex can hear you; your camera stays off. You can mute or end at any time.</p>}
         <Captions view={view} />
       </div>
       <ProfileSoFar profile={view.publicProfile} />

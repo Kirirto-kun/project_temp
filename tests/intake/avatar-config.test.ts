@@ -5,8 +5,7 @@ import { readEnv } from '@/server/env';
 const VALUES = {
   LIVEAVATAR_API_KEY: 'la-key',
   LIVEAVATAR_AVATAR_ID: 'dd73ea75-1218-4ef3-92ce-606d5f7fbc0a',
-  LIVEAVATAR_ELEVENLABS_SECRET_ID: 'secret-1',
-  ELEVENLABS_COACH_AGENT_ID: 'agent_1',
+  LIVEAVATAR_VOICE_ID: 'voice-1',
 };
 const env = (extra: Record<string, string>) => readEnv({ NODE_ENV: 'development', ...VALUES, ...extra } as NodeJS.ProcessEnv);
 
@@ -17,7 +16,7 @@ describe('avatar call flag', () => {
   });
 
   it('dev runs in the sandbox by default and can opt out for full-length calls', () => {
-    expect(env({ AVATAR_CALL: 'dev' }).liveAvatar).toEqual({ mode: 'dev', apiKey: 'la-key', avatarId: VALUES.LIVEAVATAR_AVATAR_ID, secretId: 'secret-1', agentId: 'agent_1', sandbox: true });
+    expect(env({ AVATAR_CALL: 'dev' }).liveAvatar).toEqual({ mode: 'dev', apiKey: 'la-key', avatarId: VALUES.LIVEAVATAR_AVATAR_ID, voiceId: 'voice-1', sandbox: true });
     expect(env({ AVATAR_CALL: 'dev', LIVEAVATAR_SANDBOX: 'false' }).liveAvatar?.sandbox).toBe(false);
   });
 

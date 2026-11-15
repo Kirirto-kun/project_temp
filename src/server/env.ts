@@ -1,12 +1,11 @@
 import 'server-only';
 
-/** LiveAvatar LITE video coach bound to the ElevenLabs coach agent. */
+/** LiveAvatar FULL video coach: LiveAvatar hears the user and speaks our coach's replies in this voice. */
 export interface LiveAvatarEnv {
   mode: 'dev' | 'on';
   apiKey: string;
   avatarId: string;
-  secretId: string;
-  agentId: string;
+  voiceId: string;
   sandbox: boolean;
 }
 
@@ -66,10 +65,9 @@ function readLiveAvatar(env: NodeJS.ProcessEnv, isProduction: boolean): LiveAvat
   if (flag === 'on' && env.LIVEAVATAR_AVATAR_APPROVED !== 'true') return null;
   const apiKey = str(env.LIVEAVATAR_API_KEY);
   const avatarId = str(env.LIVEAVATAR_AVATAR_ID);
-  const secretId = str(env.LIVEAVATAR_ELEVENLABS_SECRET_ID);
-  const agentId = str(env.ELEVENLABS_COACH_AGENT_ID);
-  if (!apiKey || !avatarId || !secretId || !agentId) return null;
-  return { mode: flag, apiKey, avatarId, secretId, agentId, sandbox: flag === 'dev' && env.LIVEAVATAR_SANDBOX !== 'false' };
+  const voiceId = str(env.LIVEAVATAR_VOICE_ID);
+  if (!apiKey || !avatarId || !voiceId) return null;
+  return { mode: flag, apiKey, avatarId, voiceId, sandbox: flag === 'dev' && env.LIVEAVATAR_SANDBOX !== 'false' };
 }
 
 let cached: ServerEnv | null = null;

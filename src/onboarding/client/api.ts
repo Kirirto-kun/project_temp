@@ -75,3 +75,7 @@ export async function relayTool(id: string, providerEpoch: number, callId: strin
 export async function submitPracticeAudio(id: string, audioId: string, turnId: string): Promise<IntakeView> {
   return (await apiFetch<{ intake: IntakeView }>(`/api/intake/${encodeURIComponent(id)}/practice`, { body: { audioId, turnId } })).intake;
 }
+
+export async function postVideoTurn(id: string, providerEpoch: number, itemId: string, text: string): Promise<{ intake: IntakeView; reply: string | null }> {
+  return apiFetch(`/api/intake/${encodeURIComponent(id)}/turn`, { body: { providerEpoch, itemId, text } });
+}

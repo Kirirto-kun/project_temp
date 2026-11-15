@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createLiveAvatar, LiveAvatarError } from '@/onboarding/server/liveavatar';
 
-const settings = { apiKey: 'la-key', avatarId: 'avatar-1', secretId: 'secret-1', agentId: 'agent_1', sandbox: true };
+const settings = { apiKey: 'la-key', avatarId: 'avatar-1', voiceId: 'voice-1', sandbox: false };
 const reply = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
 describe('LiveAvatar client', () => {
-  it('mints a LITE token bound to the coach agent, with the key only in the header', async () => {
+  it('mints a FULL token with the coach voice, with the key only in the header', async () => {
     const fetchImpl = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => reply(200, { code: 1000, data: { session_id: 'sess-1', session_token: 'tok-1' } }));
     const client = createLiveAvatar(settings, fetchImpl as unknown as typeof fetch);
     await expect(client.mintToken({ maxSeconds: 250.7 })).resolves.toEqual({ sessionId: 'sess-1', sessionToken: 'tok-1' });
@@ -14,12 +14,12 @@ describe('LiveAvatar client', () => {
     expect(init?.method).toBe('POST');
     expect((init?.headers as Record<string, string>)['X-API-KEY']).toBe('la-key');
     expect(JSON.parse(String(init?.body))).toEqual({
-      mode: 'LITE',
+      mode: 'FULL',
       avatar_id: 'avatar-1',
-      is_sandbox: true,
+      is_sandbox: false,
       max_session_duration: 250,
       video_settings: { quality: 'high', encoding: 'H264' },
-      elevenlabs_agent_config: { secret_id: 'secret-1', agent_id: 'agent_1' },
+      avatar_persona: { voice_id: 'voice-1', language: 'en' },
     });
   });
 
@@ -30,6 +30,13 @@ describe('LiveAvatar client', () => {
     await client.mintToken({ maxSeconds: 0.2 });
     const bodies = fetchImpl.mock.calls.map((c) => JSON.parse(String((c as unknown as [string, RequestInit])[1].body)));
     expect(bodies.map((b) => b.max_session_duration)).toEqual([300, 1]);
+  });
+
+  it('keeps sandbox sessions within the sandbox limit of 60 seconds', async () => {
+    const fetchImpl = vi.fn(async () => reply(200, { code: 1000, data: { session_id: 's', session_token: 't' } }));
+    await createLiveAvatar({ ...settings, sandbox: true }, fetchImpl as unknown as typeof fetch).mintToken({ maxSeconds: 295 });
+    const body = JSON.parse(String((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    expect(body).toMatchObject({ is_sandbox: true, max_session_duration: 60 });
   });
 
   it('rejects provider errors and unexpected bodies', async () => {
