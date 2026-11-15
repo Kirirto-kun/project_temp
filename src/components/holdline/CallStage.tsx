@@ -41,12 +41,14 @@ export interface CallStageProps {
   secondary?: { label: string; onClick(): void };
   /** Left label of the control bar after the name. Defaults to "Practice call". */
   callLabel?: string;
+  /** Let the video tile fill most of the viewport height on desktop instead of a fixed 16:9. */
+  tall?: boolean;
 }
 
 const roundButton = 'btn btn-icon !min-h-12 !w-12 sm:!min-h-[52px] sm:!w-[52px]';
 
 export function CallStage(props: CallStageProps) {
-  const { videoRef, live, state, name, subtitle, placeholder, speaking, status, timeLeft, caption, muted, startLabel, onStart, onMute, endLabel, onEnd, secondary, callLabel = 'Practice call' } = props;
+  const { videoRef, live, state, name, subtitle, placeholder, speaking, status, timeLeft, caption, muted, startLabel, onStart, onMute, endLabel, onEnd, secondary, callLabel = 'Practice call', tall = false } = props;
   const [captionsOn, setCaptionsOn] = useState(true);
   const lobby = state === 'idle';
   const closing = state === 'ending' || state === 'ended';
@@ -60,7 +62,7 @@ export function CallStage(props: CallStageProps) {
       </p>
 
       {/* Remote tile */}
-      <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[16px] bg-[var(--room-tile)] min-[480px]:aspect-[4/3] sm:aspect-video">
+      <div className={cn('relative aspect-[4/5] w-full overflow-hidden rounded-[16px] bg-[var(--room-tile)] min-[480px]:aspect-[4/3] sm:aspect-video', tall && 'lg:aspect-auto lg:h-[max(460px,calc(100dvh-15rem))]')}>
         <video
           ref={videoRef}
           autoPlay

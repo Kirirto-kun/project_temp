@@ -67,8 +67,8 @@ export function AvatarCoach({ view, onView, onFallback, onTypeInstead }: { view:
   const caption = last ? { speaker: last.role === 'coach' ? 'Alex' : 'You', text: last.text } : null;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-      <div className="grid gap-5">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_248px] lg:items-start">
+      <div className="grid gap-4">
         <CallStage
           videoRef={videoRef}
           live={live}
@@ -87,8 +87,9 @@ export function AvatarCoach({ view, onView, onFallback, onTypeInstead }: { view:
           endLabel="End and review"
           onEnd={() => void callRef.current?.end('end')}
           secondary={state === 'idle' ? { label: 'Type instead', onClick: onTypeInstead } : undefined}
+          tall
         />
-        {state === 'idle' && <p className="m-0 text-center text-[14px] leading-6 text-muted">Use headphones if you can. Your microphone goes to our video provider so Alex can hear you; your camera stays off. You can mute or end at any time.</p>}
+        {state === 'idle' && <p className="m-0 text-center text-[13px] leading-5 text-muted">Use headphones if you can. Your microphone goes to our video provider so Alex can hear you; your camera stays off. You can mute or end at any time.</p>}
         <Captions view={view} />
       </div>
       <ProfileSoFar profile={view.publicProfile} />
