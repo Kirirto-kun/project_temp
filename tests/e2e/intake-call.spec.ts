@@ -1,5 +1,72 @@
 import { test,expect } from '@playwright/test';
 
+test('sound recovery remains reachable when muted video starts playing',async({page})=>{
+  await page.goto('/');await page.getByRole('button',{name:'Preview call setup'}).click();
+  const video=page.getByLabel('Alex live video');
+  await video.evaluate(element=>{
+    const media=element as HTMLVideoElement;
+    Object.defineProperty(media,'play',{value:async()=>{media.dispatchEvent(new Event('playing'));}});
+    media.muted=true;media.dispatchEvent(new Event('playing'));
+  });
+  const sound=page.getByRole('button',{name:'Enable sound',exact:true});
+  await expect(sound).toBeVisible();await expect(sound).toHaveAttribute('data-blocked','true');
+  await sound.click();await expect(video).toHaveJSProperty('muted',false);await expect(sound).toBeVisible();
+  await expect(sound).not.toHaveAttribute('data-blocked','true');
+});
+
+for(const viewport of [{width:1440,height:900},{width:390,height:844}]) {
+  test(`call room fills ${viewport.width}px viewport and keeps controls reachable with the panel open`,async({page})=>{
+    await page.setViewportSize(viewport);
+    await page.goto('/');await page.getByRole('button',{name:'Preview call setup'}).click();
+    const room=page.getByRole('main',{name:'Call room'});
+    await expect(room).toBeVisible();
+    const bounds=await room.boundingBox();
+    expect(bounds).toMatchObject({x:0,y:0,width:viewport.width,height:viewport.height});
+    const stage=page.getByRole('region',{name:'Conversation with Alex'});
+    const stageBounds=await stage.boundingBox();
+    expect(stageBounds!.width).toBeGreaterThan(viewport.width*0.9);
+    expect(stageBounds!.height).toBeGreaterThan(viewport.height*0.55);
+    const toolbar=page.getByRole('toolbar',{name:'Call controls'});
+    for(const name of ['Check microphone','Camera off','Hide captions','Full screen','Connect to Alex']) {
+      const button=toolbar.getByRole('button',{name,exact:true});
+      await expect(button).toBeVisible();
+      const box=await button.boundingBox();
+      expect(box!.width).toBeGreaterThanOrEqual(44);expect(box!.height).toBeGreaterThanOrEqual(44);
+      expect(box!.y+box!.height).toBeLessThanOrEqual(viewport.height);
+    }
+    await expect(page.getByRole('complementary',{name:'Brief and settings'})).toBeHidden();
+    await page.getByRole('button',{name:'Open brief and settings',exact:true}).click();
+    await expect(page.getByRole('complementary',{name:'Brief and settings'})).toBeVisible();
+    await expect(toolbar.getByRole('button',{name:'Camera off',exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Close brief and settings',exact:true}).click();
+    await expect(page.getByRole('complementary',{name:'Brief and settings'})).toBeHidden();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+    await page.screenshot({path:`test-results/intake-room-${viewport.width}.png`});
+    await page.getByRole('button',{name:'Use the quick form',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Save brief',exact:true})).toBeVisible();
+  });
+}
+
+test('fullscreen is user initiated and a refused request leaves call controls usable',async({page})=>{
+  await page.addInitScript(()=>{
+    Object.assign(window,{fullscreenRequests:0});
+    Object.defineProperty(Element.prototype,'requestFullscreen',{value:async()=>{
+      (window as unknown as {fullscreenRequests:number}).fullscreenRequests++;
+      throw new DOMException('Fullscreen is not allowed','NotAllowedError');
+    }});
+  });
+  await page.goto('/');await page.getByRole('button',{name:'Preview call setup'}).click();
+  const fullscreen=page.getByRole('button',{name:'Full screen',exact:true});
+  await expect(fullscreen).toBeVisible();
+  expect(await page.evaluate(()=>(window as unknown as {fullscreenRequests:number}).fullscreenRequests)).toBe(0);
+  await fullscreen.click();
+  await expect(page.getByRole('alert').filter({hasText:'Full screen is unavailable'})).toBeVisible();
+  expect(await page.evaluate(()=>(window as unknown as {fullscreenRequests:number}).fullscreenRequests)).toBe(1);
+  await expect(page.getByRole('button',{name:'Check microphone',exact:true})).toBeEnabled();
+  await page.getByRole('button',{name:'Use the quick form',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Save brief',exact:true})).toBeVisible();
+});
+
 test('entry has no device or paid connection before an explicit action',async({page})=>{
   const external:string[]=[];page.on('request',request=>{if(/api\.liveavatar\.com|api\.elevenlabs\.io/.test(request.url()))external.push(request.url());});
   await page.addInitScript(()=>{

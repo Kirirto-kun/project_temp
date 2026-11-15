@@ -11,17 +11,31 @@ export class LiveAvatarProvider implements CallProvider {
     if(attempt.mode!=='video') throw new IntakeError(503,'MODE_UNAVAILABLE','Use the video conversation or the quick form.');
     const seconds=Math.min(this.config.sandbox?60:300,Math.floor((Date.parse(attempt.deadlineAt)-this.now())/1000));
     if(seconds<1) throw new IntakeError(410,'CALL_EXPIRED','This call has ended.');
+    let upstreamStatus:number|undefined;let providerCode:number|undefined;
     try {
       const response=await this.request('https://api.liveavatar.com/v1/sessions/token',{
         method:'POST',headers:{'X-API-KEY':this.config.apiKey,'Content-Type':'application/json'},cache:'no-store',signal:AbortSignal.timeout(10000),
         body:JSON.stringify({mode:'FULL',avatar_id:this.config.sandbox?'dd73ea75-1218-4ef3-92ce-606d5f7fbc0a':this.config.avatarId,is_sandbox:this.config.sandbox??false,max_session_duration:seconds,video_settings:{quality:'high',encoding:'H264'},avatar_persona:{voice_id:this.config.voiceId,language:'en'}}),
       });
-      if(!response.ok) throw new Error('Provider rejected session');
+      upstreamStatus=response.status;
+      if(!response.ok){
+        const body=await response.json().catch(()=>null) as {code?:unknown}|null;
+        if(typeof body?.code==='number')providerCode=body.code;
+        if(response.status===401||response.status===403)throw new IntakeError(503,'PROVIDER_ACCESS','Video calling needs its provider access restored. Your brief is saved.');
+        if(response.status===400||response.status===422)throw new IntakeError(503,'PROVIDER_CONFIGURATION','LiveAvatar rejected this call setup. Your brief is saved; you can use the form.');
+        if(response.status===429)throw new IntakeError(503,'PROVIDER_BUSY','The video service is busy. Wait a moment and try connecting again.',true);
+        throw new IntakeError(503,'PROVIDER_UNAVAILABLE','The video service is temporarily unavailable. Please try connecting again.',true);
+      }
       const {data}=tokenResponse.parse(await response.json());
       return {providerSessionId:data.session_id,credentialCiphertext:sealToken(data.session_token,this.config.encryptionKey,data.session_id)};
     }catch(error){
-      if(error instanceof IntakeError) throw error;
-      throw new IntakeError(503,'PROVIDER_UNAVAILABLE','Alex could not connect. Your brief is saved.',true);
+      const known=error instanceof IntakeError?error
+        :error instanceof Error&&(error.name==='TimeoutError'||error.name==='AbortError')?new IntakeError(504,'PROVIDER_TIMEOUT','LiveAvatar did not respond in time. Try connecting again. Your brief is saved.',true)
+        :error instanceof TypeError?new IntakeError(503,'PROVIDER_NETWORK','The video service could not be reached. Please try connecting again.',true)
+        :new IntakeError(503,'PROVIDER_RESPONSE','The video service returned an invalid connection. Your brief is saved.');
+      // Never log raw upstream bodies/errors: they can contain credentials.
+      console.warn('liveavatar.token_failed',{reason:known.code,status:upstreamStatus,providerCode});
+      throw known;
     }
   }
   async close(attempt:Attempt) {

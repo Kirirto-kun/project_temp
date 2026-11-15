@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { LiveAvatarProvider } from '@/onboarding/providers/liveavatar';
 import { sealToken, openToken } from '@/onboarding/server/token-vault';
 import type { Attempt } from '@/onboarding/server/service';
@@ -7,6 +7,8 @@ const encryptionKey = 'a'.repeat(64);
 const now = Date.parse('2026-11-15T00:00:00Z');
 const config={apiKey:'key',avatarId:'avatar',voiceId:'voice',encryptionKey};
 const attempt: Attempt = { epoch: 1, mode: 'video', clientId: 'client', deadlineAt: '2026-11-15T00:05:00.000Z', provisioned: false, providerSessionId: null, credentialCiphertext: null, createdAt: now, lastHeartbeatAt: now };
+beforeEach(()=>{vi.spyOn(console,'warn').mockImplementation(()=>{});});
+afterEach(()=>vi.restoreAllMocks());
 it('mints FULL listening mode with a TTS voice, no vendor LLM context, and encrypted credentials', async () => {
   const requests: {url:string;init:RequestInit}[]=[];
   const provider = new LiveAvatarProvider(config, async (url,init) => {
@@ -25,8 +27,22 @@ it('mints FULL listening mode with a TTS voice, no vendor LLM context, and encry
 it('fails closed on malformed provider success and does not silently retry paid operations', async () => {
   let calls=0;
   const provider=new LiveAvatarProvider(config,async()=>{calls++;return Response.json({code:1000,data:{}});},()=>now);
-  await expect(provider.open(attempt)).rejects.toMatchObject({code:'PROVIDER_UNAVAILABLE'});
+  await expect(provider.open(attempt)).rejects.toMatchObject({code:'PROVIDER_RESPONSE'});
   expect(calls).toBe(1);
+});
+it.each([[401,'PROVIDER_ACCESS',false],[422,'PROVIDER_CONFIGURATION',false],[429,'PROVIDER_BUSY',true],[503,'PROVIDER_UNAVAILABLE',true]] as const)('distinguishes upstream HTTP %i without leaking provider payloads',async(status,code,retryable)=>{
+ const provider=new LiveAvatarProvider({...config,apiKey:'private-provider-key'},async()=>Response.json({code:4001,message:'private-provider-key private-session-token'},{status}),()=>now);
+ await expect(provider.open(attempt)).rejects.toMatchObject({code,retryable,status:503});
+ const log=JSON.stringify(vi.mocked(console.warn).mock.calls);expect(log).toContain('liveavatar.token_failed');expect(log).toContain(String(status));expect(log).not.toContain('private-provider-key');expect(log).not.toContain('private-session-token');
+});
+it('reports an upstream timeout separately from microphone or credential errors',async()=>{
+ const provider=new LiveAvatarProvider(config,async()=>{throw new DOMException('Timed out','TimeoutError');},()=>now);
+ await expect(provider.open(attempt)).rejects.toMatchObject({code:'PROVIDER_TIMEOUT',status:504,retryable:true});
+});
+it('reports a failed network request without logging its raw error message',async()=>{
+ const provider=new LiveAvatarProvider(config,async()=>{throw new TypeError('fetch failed for private-provider-key');},()=>now);
+ await expect(provider.open(attempt)).rejects.toMatchObject({code:'PROVIDER_NETWORK',status:503,retryable:true});
+ expect(JSON.stringify(vi.mocked(console.warn).mock.calls)).not.toContain('private-provider-key');
 });
 it('requires a successful provider stop and scopes it to the stored session id', async () => {
   let request: RequestInit | undefined;

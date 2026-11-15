@@ -1,0 +1,43 @@
+{
+  "date": "2026-11-15",
+  "ui": "Full-window call room",
+  "autoplay": "Live probe allowed autoplay; blocked playback covered separately by browser regression",
+  "status": "passed",
+  "sandbox": true,
+  "voiceConfiguration": "Imported ElevenLabs TTS",
+  "input": "Synthetic fictional microphone",
+  "elapsedMs": 28341,
+  "stats": {
+    "videoFrames": 325,
+    "audioBytes": 49440,
+    "audioEnergy": 1.125425154890334,
+    "outboundAudio": 61021
+  },
+  "userTurns": 2,
+  "profileFields": [
+    "goal",
+    "kind",
+    "description",
+    "desiredTone",
+    "counterpartRole"
+  ],
+  "unconfirmed": true,
+  "manualEnd": true,
+  "tracksEnded": true,
+  "providerClosed": true,
+  "responses": [
+    {
+      "action": "connect",
+      "status": 200
+    },
+    {
+      "action": "respond",
+      "status": 200
+    },
+    {
+      "action": "stop",
+      "status": 200
+    }
+  ],
+  "errors": []
+}

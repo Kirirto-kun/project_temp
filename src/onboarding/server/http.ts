@@ -8,6 +8,7 @@ import { IntakeError } from './errors';
 interface ApiDependencies {
   service:CallService;profile:ProfileControl;origin:string;ownerSecret:string;maintenanceSecret:string;
   callsAvailable():Promise<boolean>;trustedIpHeader?:string;
+  avatarPreviewUrl?:string|null;
   respond?(owner:string,id:string,input:ClientRespond,signal:AbortSignal):Promise<CoachReply>;
 }
 const patchInput=z.object({expectedRevision:z.number().int().nonnegative(),patch:ProfilePatchSchema}).strict();
@@ -46,7 +47,7 @@ export function createIntakeApi(deps:ApiDependencies) {
         return respond(await deps.service.maintenance(!await deps.callsAvailable(),true));
       }
       if(request.method!=='GET'&&request.headers.get('Origin')!==deps.origin)throw new IntakeError(403,'INVALID_ORIGIN','This request must come from Holdline.');
-      if(path.length===1&&path[0]==='config'&&request.method==='GET')return respond({intakeContractVersion:2,available:await deps.callsAvailable(),sessionLimitSeconds:deps.service.sessionLimitSeconds,capabilities:{visualAnalysis:false,audioAnalysis:false,audioOnly:false}});
+      if(path.length===1&&path[0]==='config'&&request.method==='GET')return respond({intakeContractVersion:2,available:await deps.callsAvailable(),sessionLimitSeconds:deps.service.sessionLimitSeconds,avatarPreviewUrl:deps.avatarPreviewUrl??null,capabilities:{visualAnalysis:false,audioAnalysis:false,audioOnly:false}});
       const cookie=request.headers.get('Cookie')?.split(';').map(c=>c.trim()).find(c=>c.startsWith('holdline_owner='))?.slice('holdline_owner='.length);
       let ownerToken=cookie&&/^[A-Za-z0-9_-]{43}$/.test(cookie)?cookie:null;
       if(path.length===0&&request.method==='POST') {

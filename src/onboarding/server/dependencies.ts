@@ -51,7 +51,7 @@ function createDependencies() {
     const cleanup=await store.read<{revision:number;lastRunAt:number}>('maintenance-health');
     return result.rows[0]?.enabled===true&&!!cleanup&&Date.now()-cleanup.lastRunAt<15000;
   };
-  return {pool,service,profile,callsAvailable,coachCallback,api:createIntakeApi({service,profile,respond,origin:env.APP_ORIGIN,ownerSecret:env.OWNER_SECRET,maintenanceSecret:env.MAINTENANCE_SECRET,callsAvailable,trustedIpHeader:env.TRUSTED_IP_HEADER})};
+  return {pool,service,profile,callsAvailable,coachCallback,api:createIntakeApi({service,profile,respond,origin:env.APP_ORIGIN,ownerSecret:env.OWNER_SECRET,maintenanceSecret:env.MAINTENANCE_SECRET,callsAvailable,trustedIpHeader:env.TRUSTED_IP_HEADER,avatarPreviewUrl:env.LIVEAVATAR_SANDBOX==='true'?'/intake/wayne-sandbox.webp':null})};
 }
 type Dependencies=ReturnType<typeof createDependencies>;
 const scope=globalThis as typeof globalThis&{holdlineIntakeDependencies?:Dependencies};
